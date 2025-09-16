@@ -17,6 +17,7 @@ class CastProfile extends Model
 
     protected $casts = [
         'tags' => 'array',
+        'is_blur_default' => 'boolean',
     ];
 
     public function user()

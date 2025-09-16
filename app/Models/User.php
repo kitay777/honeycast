@@ -25,6 +25,7 @@ class User extends Authenticatable
         'phone',
         'is_admin',
         'shop_id',
+        'is_cast',
     ];
 
     /**
@@ -50,6 +51,7 @@ class User extends Authenticatable
             'shop_id'  => 'integer',
             'is_admin'=>'boolean',
             'is_shop_owner'=>'boolean',
+            'is_cast' => 'boolean',
         ];
     }
     public function castProfile()
@@ -61,5 +63,5 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\Shop::class);
     }
 
-
+    public function scopeCasts($q) { return $q->where('is_cast', true); }
 }

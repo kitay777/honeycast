@@ -48,7 +48,7 @@ import { Link } from '@inertiajs/vue3'
       </div>
 
       <Link href="/reservations" class="justify-self-center"><img src="/assets/icons/reserve.png" class="h-12" /></Link>
-      <Link href="/messages" class="justify-self-center"><img src="/assets/icons/message.png" class="h-12" /></Link>
+      <Link href="/chat" class="justify-self-center"><img src="/assets/icons/message.png" class="h-12" /></Link>
     </footer>
   </div>
 </template>

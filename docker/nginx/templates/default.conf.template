@@ -1,0 +1,38 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SERVER_NAME};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen ${SSL_PORT} ssl;
+    listen [::]:${SSL_PORT} ssl;
+    server_name ${SERVER_NAME};
+
+    ssl_certificate     /etc/nginx/certs/server.pem;
+    ssl_certificate_key /etc/nginx/certs/server.key;
+    ssl_session_timeout 1d;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+
+    # 静的
+    location ~* \.(?:css|js|png|jpg|jpeg|gif|ico|svg|webp|woff2?)$ {
+        expires 30d; access_log off; try_files $uri @app;
+    }
+
+    location /build/ { try_files $uri @app; }
+    location /       { try_files $uri @app; }
+
+    location @app {
+        proxy_http_version        1.1;
+        proxy_set_header          Host $host;
+        proxy_set_header          X-Forwarded-Proto $scheme;
+        proxy_set_header          X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header          X-Forwarded-Host $host;
+        proxy_set_header          X-Forwarded-Port $server_port;
+        proxy_pass                http://${APP_SERVICE};
+    }
+}

@@ -17,9 +17,58 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\Admin\CastController as AdminCastController;
 use App\Http\Controllers\Admin\ShopController;
 use App\Http\Controllers\Admin\ShopInviteController;
+use App\Http\Controllers\ChatController;
+
 
 // routes/web.php
 use App\Http\Controllers\CastProfilePermissionController;
+// routes/web.php
+use App\Events\PingPong;
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Auth\CastRegisterController;
+
+Route::middleware('guest')->group(function () {
+    Route::get ('/register/cast', [CastRegisterController::class, 'create'])->name('cast.register');
+    Route::post('/register/cast', [CastRegisterController::class, 'store'])->name('cast.register.store');
+});
+
+// 既存ユーザーが“キャスト化”だけしたい場合（任意）
+Route::middleware(['auth'])->post('/cast/upgrade', [CastRegisterController::class, 'upgrade'])
+    ->name('cast.upgrade');
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+    
+    Route::post('/casts/{cast}/start-chat', [ChatController::class,'start'])
+        ->name('casts.startChat');
+
+    Route::get('/chat/{thread}', [ChatController::class,'show'])
+        ->name('chat.show');
+
+    Route::post('/chat/{thread}/messages', [ChatController::class,'send'])
+        ->name('chat.send');
+});
+Route::get('/_ping', function () {
+    try {
+        broadcast(new PingPong('hello via broadcasting()'));
+        return response('ok', 200);
+    } catch (\Throwable $e) {
+        Log::error('BROADCAST ERROR', ['msg' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
+Route::get('/_pusher_raw', function () {
+    $p = new \Pusher\Pusher(
+        env('PUSHER_APP_KEY'),
+        env('PUSHER_APP_SECRET'),
+        env('PUSHER_APP_ID'),
+        ['cluster' => env('PUSHER_APP_CLUSTER'), 'useTLS' => true]
+    );
+    $ok = $p->trigger('test', 'PingPong', ['msg' => 'hello via raw pusher']);
+    return $ok ? 'raw-ok' : 'raw-ng';
+});
+
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/casts/{castProfile}/unblur-requests', [CastProfilePermissionController::class, 'store'])

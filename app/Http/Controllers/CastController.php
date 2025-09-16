@@ -14,6 +14,7 @@ class CastController extends Controller
 {
     public function show(CastProfile $cast)
     {
+
         // 直近1週間の予定を表示用に成形
         $today = Carbon::today();
         $days = collect(range(0, 6))->map(function ($i) use ($cast, $today) {
@@ -53,7 +54,6 @@ class CastController extends Controller
             $tags = collect(preg_split('/[,\s、，]+/u', (string) $tags, -1, PREG_SPLIT_NO_EMPTY))
                 ->values()->all();
         }
-
         return Inertia::render('Cast/Show', [
             'cast' => [
                 'id'                       => $cast->id,
