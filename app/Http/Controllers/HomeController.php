@@ -24,15 +24,14 @@ class HomeController extends Controller
 
         // ブラー計算を行う変換クロージャ
         $toCard = function (CastProfile $c) use ($viewer) {
-            $isBlurDefault = is_null($c->is_blur_default) ? true : (bool)$c->is_blur_default;
-            $hasAccess     = $c->viewerHasUnblurAccess($viewer);
+        
             return [
                 'id'                       => $c->id,
                 'nickname'                 => $c->nickname,
                 'photo_path'               => $c->photo_path,
-                'is_blur_default'          => $isBlurDefault,
-                'viewer_has_unblur_access' => $hasAccess,
-                'should_blur'              => $isBlurDefault && !$hasAccess,
+                'is_blur_default'          => true,   // 値は使われないが残しておく場合
+                'viewer_has_unblur_access' => false,  // 同上
+                'should_blur'              => false,
             ];
         };
 

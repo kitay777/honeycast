@@ -12,20 +12,24 @@ use Inertia\Inertia;
 class CastProfilePermissionController extends Controller
 {
     // 閲覧者 → 申請
-    public function store(Request $request, CastProfile $castProfile) {
+    public function store(Request $request, CastProfile $castProfile)
+    {
         $data = $request->validate([
             'message' => ['nullable','string','max:1000'],
         ]);
 
-        $perm = CastProfileViewPermission::updateOrCreate(
-            ['cast_profile_id' => $castProfile->id, 'viewer_user_id' => Auth::id()],
-            ['status' => 'pending', 'message' => $data['message'] ?? null, 'granted_by_user_id' => null, 'expires_at' => null]
+        // ★ リレーションから updateOrCreate すれば FK は自動で入ります
+        $castProfile->viewPermissions()->updateOrCreate(
+            ['viewer_user_id' => auth()->id()],
+            [
+                'status'            => 'pending',
+                'message'           => $data['message'] ?? null,
+                'granted_by_user_id'=> null,
+                'expires_at'        => null,
+            ]
         );
 
-        // 通知（任意）
-        // optional: $castProfile->user->notify(new UnblurRequested($perm));
-
-        return back()->with('success', '閲覧申請を送信しました。');
+        return back()->with('success', 'プロフィールのぼかし解除を申請しました。');
     }
 
     // キャスト → 承認

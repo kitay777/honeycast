@@ -53,4 +53,9 @@ class CastProfile extends Model
         if ($perm->expires_at && now()->greaterThan($perm->expires_at)) return false;
         return true;
     }
+
+    public function photos()
+    {
+        return $this->hasMany(\App\Models\CastPhoto::class)->orderBy('sort_order');
+    }
 }

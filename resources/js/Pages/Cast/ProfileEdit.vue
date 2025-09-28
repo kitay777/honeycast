@@ -1,24 +1,25 @@
+<!-- resources/js/Pages/Cast/ProfileEdit.vue -->
 <script setup>
-import { Head, Link, useForm } from "@inertiajs/vue3";
-import { ref, computed } from "vue";
-import AppLayout from "@/Layouts/AppLayout.vue";
-import { router } from "@inertiajs/vue3";
+import AppLayout from "@/Layouts/AppLayout.vue"
+import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3"
+import { ref, computed } from "vue"
 
+/* ====== props ====== */
 const props = defineProps({
-  cast: { type: Object, default: null },
-  profile: { type: Object, default: null },
-  pendingPermissions: { type: Array, default: () => [] },
-});
+  cast: { type: Object, default: null },                 // { id, nickname, ..., photo_path, photos?: [{id,url,sort_order,is_primary}] }
+  pendingPermissions: { type: Array, default: () => [] }, // ぼかし解除の承認待ち一覧
+  pendingPhotoPermissions: { type: Array, default: () => [] },
+})
 
-// cast or profile のどちらでも
-const p = computed(() => props.cast ?? props.profile ?? {});
+/* ====== 安全な初期化 ====== */
+const p = computed(() => props.cast ?? {})
 
-// tags 配列保証
+/* tags を配列化（サーバが文字列でも崩れないように） */
 const initialTags = Array.isArray(p.value?.tags)
   ? p.value.tags
-  : (p.value?.tags ? String(p.value.tags).split(/[\s,，、]+/).filter(Boolean) : []);
+  : (p.value?.tags ? String(p.value.tags).split(/[\s,，、]+/).filter(Boolean) : [])
 
-// フォーム初期化は p から
+/* ====== プロフィール基本フォーム ====== */
 const form = useForm({
   id: p.value?.id ?? null,
   nickname: p.value?.nickname ?? "",
@@ -32,290 +33,351 @@ const form = useForm({
   area: p.value?.area ?? "",
   tags: [...initialTags],
   freeword: p.value?.freeword ?? "",
+  // 旧・単発アップロード互換（使わなければ空のまま）
   photo: null,
-});
+})
 
-// プレビュー
-const previewUrl = ref(p.value?.photo_path ? `/storage/${p.value.photo_path}` : null);
-const onPhotoChange = (e) => {
-  const f = e.target.files?.[0] ?? null;
-  form.photo = f;
-  if (f) previewUrl.value = URL.createObjectURL(f);
-};
+/* ====== 写真管理（複数） ====== */
+const existing = ref(
+  (p.value?.photos ?? []).map(ph => ({
+    id: ph.id,
+    url: ph.url ?? (ph.path ? `/storage/${ph.path}` : null),
+    sort_order: ph.sort_order ?? 0,
+    is_primary: !!ph.is_primary,
+    _delete: false
+  }))
+)
+const primaryId = ref(existing.value.find(x => x.is_primary)?.id || null)
+const newFiles = ref([])
 
-// route() フォールバック
-const r = (...args) => (typeof route === "function" ? route(...args) : null);
+/* 安全なプレビューURL生成/解放 */
+const getPreviewUrl = (file) => {
+  try {
+    if (typeof file === 'object' && file && (file instanceof Blob || file instanceof File)) {
+      const URL_ = (globalThis?.URL || window?.URL || self?.URL)
+      return URL_?.createObjectURL ? URL_.createObjectURL(file) : ''
+    }
+  } catch (_) {}
+  return ''
+}
+const revokePreviewUrl = (src) => {
+  try {
+    const URL_ = (globalThis?.URL || window?.URL || self?.URL)
+    URL_?.revokeObjectURL?.(src)
+  } catch (_) {}
+}
 
-// 申請承認/否認
+/* 追加 */
+const onAddPhotos = (e) => {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  newFiles.value.push(...files)
+  e.target.value = "" // 同じファイル選択で再発火させる
+}
+/* 並び替え */
+const move = (idx, dir) => {
+  const to = idx + dir
+  if (to < 0 || to >= existing.value.length) return
+  const a = existing.value[idx]
+  existing.value[idx] = existing.value[to]
+  existing.value[to] = a
+}
+/* メイン */
+const setPrimary = (ph) => {
+  if (ph._delete) return
+  primaryId.value = ph.id
+}
+/* 削除トグル */
+const toggleDelete = (ph) => {
+  ph._delete = !ph._delete
+  if (ph._delete && primaryId.value === ph.id) primaryId.value = null
+}
+
+/* ====== ぼかし解除承認/否認 ====== */
+const r = (...args) => (typeof route === "function" ? route(...args) : null)
 const approve = (permId) => {
-  const id = p.value?.id; if (!id) return;
-  if (r) router.post(r("casts.unblur.approve", { castProfile: id, permission: permId }), { expires_at: null });
-  else router.post(`/casts/${id}/unblur-requests/${permId}/approve`, { expires_at: null });
-};
+  const id = form.id; if (!id) return
+  if (r) router.post(r("casts.unblur.approve", { castProfile: id, permission: permId }), { expires_at: null })
+  else   router.post(`/casts/${id}/unblur-requests/${permId}/approve`, { expires_at: null })
+}
 const deny = (permId) => {
-  const id = p.value?.id; if (!id) return;
-  if (r) router.post(r("casts.unblur.deny", { castProfile: id, permission: permId }));
-  else router.post(`/casts/${id}/unblur-requests/${permId}/deny`);
-};
+  const id = form.id; if (!id) return
+  if (r) router.post(r("casts.unblur.deny", { castProfile: id, permission: permId }))
+  else   router.post(`/casts/${id}/unblur-requests/${permId}/deny`)
+}
 
-// 保存
+/* ====== 送信 ====== */
 const submit = () => {
-  if (r) form.post(r("cast.profile.update"), { forceFormData: true });
-  else   form.post("/cast/profile/update",   { forceFormData: true });
-};
+  form.transform((data) => {
+    const fd = new FormData()
+    // 基本
+    fd.append("nickname", data.nickname ?? "")
+    if (data.rank !== "") fd.append("rank", data.rank)
+    if (data.age !== "") fd.append("age", data.age)
+    if (data.height_cm !== "") fd.append("height_cm", data.height_cm)
+    fd.append("cup", data.cup ?? "")
+    fd.append("style", data.style ?? "")
+    fd.append("alcohol", data.alcohol ?? "")
+    fd.append("mbti", (data.mbti ?? "").toString().toUpperCase())
+    fd.append("area", data.area ?? "")
+    ;(data.tags || []).forEach(t => fd.append("tags[]", t))
+    fd.append("freeword", data.freeword ?? "")
+
+    // 旧・単発（互換）
+    if (data.photo instanceof File) fd.append("photo", data.photo)
+
+    // 追加（複数）
+    newFiles.value.forEach(f => fd.append("photos[]", f))
+
+    // 並び（1..N）
+    existing.value.forEach((ph, i) => {
+      if (!ph.id) return
+      fd.append(`orders[${i}][id]`, ph.id)
+      fd.append(`orders[${i}][order]`, i + 1)
+    })
+
+    // 削除
+    existing.value.filter(ph => ph._delete && ph.id).forEach(ph => fd.append("delete_photo_ids[]", ph.id))
+
+    // メイン
+    if (primaryId.value) fd.append("primary_photo_id", primaryId.value)
+
+    return fd
+  }).post(r ? r("cast.profile.update") : "/cast/profile", {
+    forceFormData: true,
+    preserveScroll: true,
+    onSuccess: () => {
+      newFiles.value = []
+      // 反映を強くしたい場合: router.reload({ only: ['cast'] })
+    }
+  })
+}
+
+/* ====== 補助 ====== */
+const candidateTags = [
+  "ギャル","清楚","アイドル","オタク","可愛い","キレイ","高身長","低身長",
+  "スレンダー","細身","グラマー","ロングヘア","ショートヘア","金髪","茶髪","黒髪","明るい","ワイワイ"
+]
+const toggleTag = (t) => {
+  const i = form.tags.indexOf(t)
+  if (i >= 0) form.tags.splice(i, 1)
+  else form.tags.push(t)
+}
+
+const page = usePage()
+const authedUser = computed(() => page.props?.auth?.user ?? null)
+// 写真ごとの承認/否認
+const approvePhoto = (perm) => {
+  const photoId = perm.photo_id
+  if (!photoId) return
+  if (r) router.post(r("photos.unblur.approve", { castPhoto: photoId, permission: perm.id }), { expires_at: null })
+  else   router.post(`/photos/${photoId}/unblur-requests/${perm.id}/approve`, { expires_at: null })
+}
+const denyPhoto = (perm) => {
+  const photoId = perm.photo_id
+  if (!photoId) return
+  if (r) router.post(r("photos.unblur.deny", { castPhoto: photoId, permission: perm.id }))
+  else   router.post(`/photos/${photoId}/unblur-requests/${perm.id}/deny`)
+}
 </script>
 
-
 <template>
-    <AppLayout>
-        <Head title="キャストプロフィール編集" />
-        <div
-            class="min-h-dvh w-screen flex items-center justify-center bg-black"
-        >
-            <div
-                class="relative w-full h-dvh md:w-[390px] md:h-[844px] mx-auto bg-[url('/assets/imgs/back.png')] bg-no-repeat bg-center bg-[length:100%_100%] overflow-y-auto"
-            >
-                <div class="px-6 pt-8 pb-24 text-white/90">
-                    <h1 class="text-2xl font-semibold mb-6">
-                        プロフィール編集
-                    </h1>
+  <AppLayout>
+    <Head title="キャストプロフィール編集" />
+    <div class="min-h-dvh w-screen flex items-center justify-center bg-black">
+      <div class="relative w-full h-dvh md:w-[390px] md:h-[844px] mx-auto
+                  bg-[url('/assets/imgs/back.png')] bg-no-repeat bg-center bg-[length:100%_100%] overflow-y-auto">
+        <div class="px-6 pt-8 pb-24 text-white/90">
 
-                    <!-- 顔写真 -->
-                    <div class="mb-6">
-                        <div class="flex items-center gap-4">
-                            <div
-                                class="w-28 h-28 rounded-full overflow-hidden bg-white/10 shrink-0"
-                            >
-                                <img
-                                    v-if="previewUrl"
-                                    :src="previewUrl"
-                                    class="w-full h-full object-cover"
-                                />
-                                <div
-                                    v-else
-                                    class="w-full h-full flex items-center justify-center text-sm text-white/60"
-                                >
-                                    No Photo
-                                </div>
-                            </div>
-                            <label
-                                class="inline-block px-4 py-2 rounded-md bg-yellow-200 text-black font-semibold cursor-pointer"
-                            >
-                                画像を選ぶ
-                                <input
-                                    type="file"
-                                    class="hidden"
-                                    accept="image/*"
-                                    @change="onPhotoChange"
-                                />
-                            </label>
-                        </div>
-                        <p class="mt-2 text-xs text-white/60">
-                            jpeg/png/gif/webp、4MBまで
-                        </p>
-                        <div
-                            v-if="form.errors.photo"
-                            class="text-xs text-red-300 mt-1"
-                        >
-                            {{ form.errors.photo }}
-                        </div>
-                    </div>
+          <h1 class="text-2xl font-semibold mb-6">プロフィール編集</h1>
 
-    <div v-if="(pendingPermissions?.length || 0) > 0" class="mb-6">
-      <h3 class="font-bold mt-6 mb-2">未処理の閲覧申請</h3>
-      <ul class="space-y-2">
-        <li v-for="pmt in pendingPermissions" :key="pmt.id" class="p-3 rounded border">
-          <div class="text-sm opacity-70">申請者: {{ pmt.viewer.name }} (ID: {{ pmt.viewer.id }})</div>
-          <div class="text-sm">メッセージ: {{ pmt.message || "（なし）" }}</div>
-          <div class="mt-2 space-x-2">
-            <button @click="approve(pmt.id)" class="bg-green-600 text-white rounded px-3 py-1">承認</button>
-            <button @click="deny(pmt.id)" class="bg-gray-400 text-white rounded px-3 py-1">否認</button>
-          </div>
-        </li>
-      </ul>
-    </div>
-
-                    <Link
-                        :href="`/casts/${form.id}/schedule`"
-                        class="inline-block text-sm underline text-yellow-200"
-                    >
-                        ● スケジュール編集へ
-                    </Link>
-                    <Link
-                        href="/tweets"
-                        class="inline-block text-sm underline text-yellow-200 ml-4"
-                    >
-                        ● ツイート
-                    </Link>
-                    <Link
-                        href="/logout"
-                        method="post"
-                        as="button"
-                        class="inline-block text-sm underline text-yellow-200 ml-4"
-                    >
-                        ● ログアウト
-                    </Link>
-                    <form @submit.prevent="submit" class="space-y-5">
-                        <div>
-                            <label class="block mb-1 text-sm"
-                                >ニックネーム</label
-                            >
-                            <input
-                                v-model="form.nickname"
-                                type="text"
-                                class="w-full h-11 rounded-md px-3 text-black"
-                            />
-                            <p
-                                v-if="form.errors.nickname"
-                                class="text-xs text-red-300 mt-1"
-                            >
-                                {{ form.errors.nickname }}
-                            </p>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block mb-1 text-sm">ランク</label>
-                                <input
-                                    v-model.number="form.rank"
-                                    type="number"
-                                    min="0"
-                                    max="99"
-                                    class="w-full h-11 rounded-md px-3 text-black"
-                                />
-                            </div>
-                            <div>
-                                <label class="block mb-1 text-sm">年齢</label>
-                                <input
-                                    v-model.number="form.age"
-                                    type="number"
-                                    min="18"
-                                    max="99"
-                                    class="w-full h-11 rounded-md px-3 text-black"
-                                />
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block mb-1 text-sm"
-                                    >身長(cm)</label
-                                >
-                                <input
-                                    v-model.number="form.height_cm"
-                                    type="number"
-                                    min="120"
-                                    max="220"
-                                    class="w-full h-11 rounded-md px-3 text-black"
-                                />
-                            </div>
-                            <div>
-                                <label class="block mb-1 text-sm">カップ</label>
-                                <input
-                                    v-model="form.cup"
-                                    type="text"
-                                    placeholder="A〜H等"
-                                    class="w-full h-11 rounded-md px-3 text-black"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block mb-1 text-sm">エリア</label>
-                            <select
-                                v-model="form.area"
-                                class="w-full h-11 rounded-md px-3 text-black"
-                            >
-                                <option value="">選択してください</option>
-                                <option>北海道・東北</option>
-                                <option>関東</option>
-                                <option>中部</option>
-                                <option>近畿</option>
-                                <option>中国・四国</option>
-                                <option>九州・沖縄</option>
-                            </select>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block mb-1 text-sm"
-                                    >スタイル</label
-                                >
-                                <select
-                                    v-model="form.style"
-                                    class="w-full h-11 rounded-md px-3 text-black"
-                                >
-                                    <option value="">未選択</option>
-                                    <option>スレンダー</option>
-                                    <option>細身</option>
-                                    <option>グラマー</option>
-                                    <option>その他</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block mb-1 text-sm">お酒</label>
-                                <select
-                                    v-model="form.alcohol"
-                                    class="w-full h-11 rounded-md px-3 text-black"
-                                >
-                                    <option value="">未選択</option>
-                                    <option>飲む</option>
-                                    <option>少し</option>
-                                    <option>飲まない</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block mb-1 text-sm">MBTI</label>
-                            <input
-                                v-model="form.mbti"
-                                maxlength="4"
-                                placeholder="ENFPなど"
-                                class="w-full h-11 rounded-md px-3 text-black uppercase"
-                            />
-                        </div>
-
-                        <div>
-                            <label class="block mb-2 text-sm">タグ</label>
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    v-for="t in candidateTags"
-                                    :key="t"
-                                    type="button"
-                                    @click="toggleTag(t)"
-                                    class="px-3 py-1 rounded-full text-sm"
-                                    :class="
-                                        form.tags.includes(t)
-                                            ? 'bg-yellow-200 text-black'
-                                            : 'bg:white/20 bg-white/20'
-                                    "
-                                >
-                                    {{ t }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block mb-1 text-sm">自己紹介</label>
-                            <textarea
-                                v-model="form.freeword"
-                                rows="4"
-                                class="w-full rounded-md px-3 py-2 text-black"
-                            ></textarea>
-                        </div>
-
-                        <div class="mt-4">
-                            <button
-                                :disabled="form.processing"
-                                class="w-full h-12 rounded-md font-bold tracking-[0.5em] bg-[#7a560f] text-white border border-[#c79a2b] shadow hover:brightness-110"
-                            >
-                                更　新
-                            </button>
-                        </div>
-                    </form>
+          <!-- 承認待ち（ぼかし解除） -->
+          <div v-if="(pendingPermissions?.length || 0) > 0" class="mb-6">
+            <h3 class="font-bold mt-2 mb-2">未処理の閲覧申請</h3>
+            <ul class="space-y-2">
+              <li v-for="pmt in pendingPermissions" :key="pmt.id" class="p-3 rounded border border-white/20 bg-white/5">
+                <div class="text-sm opacity-80">申請者: {{ pmt.viewer.name }} (ID: {{ pmt.viewer.id }})</div>
+                <div class="text-sm">メッセージ: {{ pmt.message || "（なし）" }}</div>
+                <div class="mt-2 space-x-2">
+                  <button @click="approve(pmt.id)" class="bg-green-600 text-white rounded px-3 py-1">承認</button>
+                  <button @click="deny(pmt.id)" class="bg-gray-500 text-white rounded px-3 py-1">否認</button>
                 </div>
-            </div>
+              </li>
+            </ul>
+          </div>
+<!-- ★ 承認待ち（ぼかし解除：写真） -->
+<div v-if="(pendingPhotoPermissions?.length || 0) > 0" class="mb-6">
+  <h3 class="font-bold mt-2 mb-2">未処理の閲覧申請（写真）</h3>
+  <ul class="grid grid-cols-1 gap-3">
+    <li v-for="perm in pendingPhotoPermissions" :key="perm.id"
+        class="p-3 rounded border border-white/20 bg-white/5 flex items-center gap-3">
+      <img v-if="perm.thumb" :src="perm.thumb" class="w-20 h-14 object-cover rounded" />
+      <div class="flex-1">
+        <div class="text-sm">
+          申請者: <span class="opacity-90">{{ perm.viewer?.name }} (ID: {{ perm.viewer?.id }})</span>
         </div>
-    </AppLayout>
+        <div class="text-xs opacity-80">メッセージ: {{ perm.message || '（なし）' }}</div>
+        <div class="text-[11px] opacity-60">申請日時: {{ perm.created_at }}</div>
+      </div>
+      <div class="shrink-0 space-x-2">
+        <button @click="approvePhoto(perm)" class="bg-green-600 text-white rounded px-3 py-1 text-sm">承認</button>
+        <button @click="denyPhoto(perm)"    class="bg-gray-500  text-white rounded px-3 py-1 text-sm">否認</button>
+      </div>
+    </li>
+  </ul>
+  <div class="mt-1 text-xs opacity-70">
+    ※ 写真の承認は、その写真だけ非ぼかし表示になります（プロフィール全体の許可とは独立）。
+  </div>
+</div>
+          <!-- スケジュール・その他リンク -->
+          <div class="mb-4 flex flex-wrap gap-4 items-center">
+            <Link v-if="form.id" :href="`/casts/${form.id}/schedule`" class="text-sm underline text-yellow-200">
+              ● スケジュール編集へ
+            </Link>
+            <Link href="/tweets" class="text-sm underline text-yellow-200">
+              ● ツイート
+            </Link>
+            <Link href="/logout" method="post" as="button" class="text-sm underline text-yellow-200">
+              ● ログアウト
+            </Link>
+          </div>
+
+          <!-- 基本プロフィール -->
+          <form @submit.prevent="submit" class="space-y-5">
+            <div>
+              <label class="block mb-1 text-sm">ニックネーム</label>
+              <input v-model="form.nickname" type="text" class="w-full h-11 rounded-md px-3 text-black" />
+              <p v-if="form.errors.nickname" class="text-xs text-red-300 mt-1">{{ form.errors.nickname }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block mb-1 text-sm">ランク</label>
+                <input v-model.number="form.rank" type="number" min="0" max="99" class="w-full h-11 rounded-md px-3 text-black" />
+                <p v-if="form.errors.rank" class="text-xs text-red-300 mt-1">{{ form.errors.rank }}</p>
+              </div>
+              <div>
+                <label class="block mb-1 text-sm">年齢</label>
+                <input v-model.number="form.age" type="number" min="18" max="99" class="w-full h-11 rounded-md px-3 text-black" />
+                <p v-if="form.errors.age" class="text-xs text-red-300 mt-1">{{ form.errors.age }}</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block mb-1 text-sm">身長(cm)</label>
+                <input v-model.number="form.height_cm" type="number" min="120" max="220" class="w-full h-11 rounded-md px-3 text-black" />
+                <p v-if="form.errors.height_cm" class="text-xs text-red-300 mt-1">{{ form.errors.height_cm }}</p>
+              </div>
+              <div>
+                <label class="block mb-1 text-sm">カップ</label>
+                <input v-model="form.cup" type="text" placeholder="A〜H等" class="w-full h-11 rounded-md px-3 text-black" />
+                <p v-if="form.errors.cup" class="text-xs text-red-300 mt-1">{{ form.errors.cup }}</p>
+              </div>
+            </div>
+
+            <div>
+              <label class="block mb-1 text-sm">エリア</label>
+              <select v-model="form.area" class="w-full h-11 rounded-md px-3 text-black">
+                <option value="">選択してください</option>
+                <option>北海道・東北</option><option>関東</option><option>中部</option>
+                <option>近畿</option><option>中国・四国</option><option>九州・沖縄</option>
+              </select>
+              <p v-if="form.errors.area" class="text-xs text-red-300 mt-1">{{ form.errors.area }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block mb-1 text-sm">スタイル</label>
+                <select v-model="form.style" class="w-full h-11 rounded-md px-3 text-black">
+                  <option value="">未選択</option>
+                  <option>スレンダー</option><option>細身</option><option>グラマー</option><option>その他</option>
+                </select>
+              </div>
+              <div>
+                <label class="block mb-1 text-sm">お酒</label>
+                <select v-model="form.alcohol" class="w-full h-11 rounded-md px-3 text-black">
+                  <option value="">未選択</option>
+                  <option>飲む</option><option>少し</option><option>飲まない</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block mb-1 text-sm">MBTI</label>
+              <input v-model="form.mbti" maxlength="4" placeholder="ENFPなど" class="w-full h-11 rounded-md px-3 text-black uppercase" />
+              <p v-if="form.errors.mbti" class="text-xs text-red-300 mt-1">{{ form.errors.mbti }}</p>
+            </div>
+
+            <div>
+              <label class="block mb-2 text-sm">タグ</label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="t in candidateTags" :key="t" type="button" @click="toggleTag(t)"
+                  class="px-3 py-1 rounded-full text-sm"
+                  :class="form.tags.includes(t) ? 'bg-yellow-200 text-black' : 'bg-white/20'">
+                  {{ t }}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block mb-1 text-sm">自己紹介</label>
+              <textarea v-model="form.freeword" rows="4" class="w-full rounded-md px-3 py-2 text-black"></textarea>
+              <p v-if="form.errors.freeword" class="text-xs text-red-300 mt-1">{{ form.errors.freeword }}</p>
+            </div>
+
+            <!-- =============== 写真管理（複数） =============== -->
+            <div class="pt-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="font-semibold">写真</h3>
+                <label class="px-3 py-1 rounded bg-yellow-200 text-black cursor-pointer text-sm">
+                  追加
+                  <input type="file" accept="image/*" multiple class="hidden" @change="onAddPhotos" />
+                </label>
+              </div>
+
+              <div v-if="existing.length" class="grid grid-cols-3 gap-3">
+                <div v-for="(ph, idx) in existing" :key="ph.id" class="relative border border-white/20 rounded overflow-hidden">
+                  <img :src="ph.url" class="w-full h-28 object-cover" />
+                  <div class="absolute top-1 left-1 flex gap-1">
+                    <button type="button" @click="move(idx,-1)" class="px-1 py-0.5 text-xs bg-black/50 text-white rounded">↑</button>
+                    <button type="button" @click="move(idx, 1)" class="px-1 py-0.5 text-xs bg-black/50 text-white rounded">↓</button>
+                  </div>
+                  <div class="absolute top-1 right-1">
+                    <button type="button"
+                            :class="['px-1 py-0.5 text-xs rounded', ph.id===primaryId && !ph._delete ? 'bg-amber-400 text-black' : 'bg-black/50 text-white']"
+                            @click="setPrimary(ph)">★</button>
+                  </div>
+                  <button type="button"
+                          class="absolute bottom-1 right-1 px-1.5 py-0.5 text-xs bg-red-600 text-white rounded"
+                          @click="toggleDelete(ph)">
+                    {{ ph._delete ? '復活' : '削除' }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="newFiles.length" class="mt-2">
+                <div class="text-sm opacity-80 mb-1">追加予定（保存で反映）</div>
+                <div class="flex flex-wrap gap-3">
+                  <div v-for="(f,i) in newFiles" :key="i" class="w-24 h-24 border border-white/20 rounded overflow-hidden">
+                    <img :src="getPreviewUrl(f)" class="w-full h-full object-cover" @load="revokePreviewUrl($event.target.src)" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- ============================================== -->
+
+            <div class="pt-4">
+              <button :disabled="form.processing"
+                      class="w-full h-12 rounded-md font-bold tracking-[0.5em] bg-[#7a560f] text-white border border-[#c79a2b] shadow hover:brightness-110">
+                更　新
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    </div>
+  </AppLayout>
 </template>

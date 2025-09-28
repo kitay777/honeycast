@@ -26,7 +26,16 @@ use App\Http\Controllers\CastProfilePermissionController;
 use App\Events\PingPong;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Auth\CastRegisterController;
+use App\Http\Controllers\CastPhotoPermissionController;
 
+Route::middleware(['auth'])->group(function () {
+    Route::post('/photos/{castPhoto}/unblur-requests', [CastPhotoPermissionController::class, 'store'])
+        ->name('photos.unblur.request');
+    Route::post('/photos/{castPhoto}/unblur-requests/{permission}/approve', [CastPhotoPermissionController::class, 'approve'])
+        ->name('photos.unblur.approve');
+    Route::post('/photos/{castPhoto}/unblur-requests/{permission}/deny', [CastPhotoPermissionController::class, 'deny'])
+        ->name('photos.unblur.deny');
+});
 Route::middleware('guest')->group(function () {
     Route::get ('/register/cast', [CastRegisterController::class, 'create'])->name('cast.register');
     Route::post('/register/cast', [CastRegisterController::class, 'store'])->name('cast.register.store');

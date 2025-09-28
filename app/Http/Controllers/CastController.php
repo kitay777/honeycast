@@ -8,79 +8,104 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage; // ★ 追加
 use Inertia\Inertia;
 
 class CastController extends Controller
 {
-    public function show(CastProfile $cast)
-    {
 
-        // 直近1週間の予定を表示用に成形
-        $today = Carbon::today();
-        $days = collect(range(0, 6))->map(function ($i) use ($cast, $today) {
-            $d = $today->copy()->addDays($i)->toDateString();
-            $slots = $cast->shifts()->whereDate('date', $d)
-                ->orderBy('start_time')
-                ->get(['start_time', 'end_time'])
-                ->map(fn($s) => [
-                    'start' => substr($s->start_time, 0, 5),
-                    'end'   => substr($s->end_time, 0, 5),
-                ]);
+public function show(CastProfile $cast)
+{
+    /* ▼▼ ここを必ず最初に置く：直近1週間のスケジュール生成 ▼▼ */
+    $today = Carbon::today();
+    $days = collect(range(0, 6))->map(function ($i) use ($cast, $today) {
+        $d = $today->copy()->addDays($i)->toDateString();
+        $slots = $cast->shifts()->whereDate('date', $d)
+            ->orderBy('start_time')
+            ->get(['start_time', 'end_time'])
+            ->map(fn($s) => [
+                'start' => substr($s->start_time, 0, 5),
+                'end'   => substr($s->end_time, 0, 5),
+            ]);
 
-            return [
-                'date'    => $d,
-                'weekday' => $today->copy()->addDays($i)->locale('ja')->isoFormat('ddd'),
-                'slots'   => $slots,
-            ];
-        });
-
-        // ====== ブラー判定付与 ======
-        $viewer = Auth::user();
-        // モデル側に viewerHasUnblurAccess(User|null $viewer): bool がある前提（前ターンで定義済み）
-        $viewerHasAccess = $cast->viewerHasUnblurAccess($viewer);
-        $isBlurDefault   = is_null($cast->is_blur_default) ? true : (bool)$cast->is_blur_default;
-        $shouldBlur      = $isBlurDefault && !$viewerHasAccess;     // 最終的にブラーを掛けるか?
-
-        // 閲覧者の申請状態（unblur 用）
-        $perm = $cast->permissionFor($viewer); // null 可
-        $unblur = [
-            'requested' => (bool) ($perm && $perm->status === 'pending'),
-            'status'    => $perm->status ?? null, // null|pending|approved|denied
+        return [
+            'date'    => $d,
+            'weekday' => $today->copy()->addDays($i)->locale('ja')->isoFormat('ddd'),
+            'slots'   => $slots,
         ];
+    });
+    /* ▲▲ ここまで ― $days を必ず定義 ▲▲ */
 
-        // tags が文字列なら配列化（カンマ/空白区切り）
-        $tags = $cast->tags;
-        if (!is_array($tags)) {
-            $tags = collect(preg_split('/[,\s、，]+/u', (string) $tags, -1, PREG_SPLIT_NO_EMPTY))
-                ->values()->all();
-        }
-        return Inertia::render('Cast/Show', [
-            'cast' => [
-                'id'                       => $cast->id,
-                'nickname'                 => $cast->nickname,
-                'photo_path'               => $cast->photo_path,
-                'rank'                     => $cast->rank,
-                'age'                      => $cast->age,
-                'height_cm'                => $cast->height_cm,
-                'cup'                      => $cast->cup,
-                'style'                    => $cast->style,
-                'alcohol'                  => $cast->alcohol,
-                'mbti'                     => $cast->mbti,
-                'area'                     => $cast->area,
-                'tags'                     => $tags,
-                'freeword'                 => $cast->freeword,
-                'user_id'                  => $cast->user_id,
+    $viewer = Auth::user();
 
-                // ★ ブラー関連をフロントへ
-                'is_blur_default'          => $isBlurDefault,
-                'viewer_has_unblur_access' => $viewerHasAccess,
-                'should_blur'              => $shouldBlur,
+    // プロフ許可は使わず、本人/管理者のみ無条件アンブラー
+    $isOwnerOrAdmin = $viewer && (
+        $cast->user_id === $viewer->id ||
+        (method_exists($viewer, 'isAdmin') && $viewer->isAdmin())
+    );
+    $isBlurDefault = is_null($cast->is_blur_default) ? true : (bool)$cast->is_blur_default;
+
+    // 写真ごとのぼかし判定（個別申請のみで解除）
+    $photos = $cast->photos()->orderBy('sort_order')->get()->map(function ($p) use ($viewer, $isOwnerOrAdmin, $isBlurDefault) {
+        $photoDefault   = is_null($p->is_blur_default) ? true : (bool)$p->is_blur_default;
+        $photoHasAccess = $isOwnerOrAdmin || $p->viewerHasUnblurAccess($viewer); // ※プロフ許可は足さない
+        $photoPerm      = $p->permissionFor($viewer);
+       // ★ マスター（primary）は常に非ブラー
+       if ($p->is_primary) {
+           $should = false;
+       } else {
+           $should = ($isBlurDefault || $photoDefault) && !$photoHasAccess;
+       }
+
+        return [
+            'id'           => $p->id,
+            'url'          => Storage::disk('public')->url($p->path),
+            'is_primary'   => (bool)$p->is_primary,
+            'should_blur'  => $should,
+            'unblur'       => [
+                'requested' => (bool) ($photoPerm && $photoPerm->status === 'pending'),
+                'status'    => $photoPerm->status ?? null,
             ],
-            'schedule' => $days,
-            // ★ 申請UI用
-            'unblur'   => $unblur,
-        ]);
+        ];
+    });
+
+    // タグ配列化
+    $tags = $cast->tags;
+    if (!is_array($tags)) {
+        $tags = collect(preg_split('/[,\s、，]+/u', (string)$tags, -1, PREG_SPLIT_NO_EMPTY))
+            ->values()->all();
     }
+
+    return Inertia::render('Cast/Show', [
+        'cast' => [
+            'id'         => $cast->id,
+            'nickname'   => $cast->nickname,
+            'photo_path' => $cast->photo_path,
+            'rank'       => $cast->rank,
+            'age'        => $cast->age,
+            'height_cm'  => $cast->height_cm,
+            'cup'        => $cast->cup,
+            'style'      => $cast->style,
+            'alcohol'    => $cast->alcohol,
+            'mbti'       => $cast->mbti,
+            'area'       => $cast->area,
+            'tags'       => $tags,
+            'freeword'   => $cast->freeword,
+            'user_id'    => $cast->user_id,
+
+            // フォールバック用
+            'is_blur_default'       => $isBlurDefault,
+            'viewer_is_owner_admin' => $isOwnerOrAdmin,
+            'should_blur' => false,
+
+            // サブ写真（個別申請のみで解除）
+            'photos' => $photos,
+        ],
+        'schedule' => $days,
+    ]);
+}
+
+
 
     /** 編集画面 */
     public function editSchedule(CastProfile $cast)
@@ -93,7 +118,7 @@ class CastController extends Controller
             $slots = $cast->shifts()->whereDate('date', $d)
                 ->orderBy('start_time')
                 ->get(['start_time', 'end_time'])
-                ->map(fn($s) => [
+                ->map(fn ($s) => [
                     'start' => substr($s->start_time, 0, 5),
                     'end'   => substr($s->end_time, 0, 5),
                 ]);
@@ -122,7 +147,6 @@ class CastController extends Controller
         DB::transaction(function () use ($cast, $data) {
             $dates = collect($data['days'])->pluck('date')->all();
 
-            // 対象日の既存枠を一旦削除して入れ直し（単純で安全）
             CastShift::where('cast_profile_id', $cast->id)
                 ->whereIn('date', $dates)
                 ->delete();

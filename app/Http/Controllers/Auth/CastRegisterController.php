@@ -86,6 +86,7 @@ class CastRegisterController extends Controller
             'user_id'         => $user->id,
             'is_blur_default' => true,
         ]);
+
         if (!$user->is_cast) {
             $user->forceFill(['is_cast' => true])->save();
         }
