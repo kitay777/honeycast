@@ -34,6 +34,18 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+                    // 友だち追加導線（常に props で渡す）
+            'line' => [
+                'friend_url' => config('services.line.friend_url'),
+                'friend_qr'  => config('services.line.friend_qr'),
+            ],
+
+            // セッションフラッシュに 'line' を載せて Vue 側で拾えるように
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error'   => fn () => $request->session()->get('error'),
+                'line'    => fn () => $request->session()->get('line'),   // ★追加
+            ],
         ];
     }
 }

@@ -37,6 +37,7 @@ const handleNo = () => {
         <div class="mt-6 space-y-2">
           <a href="/register" class="block text-yellow-200 underline">登録のお客様はこちら</a>
           <a href="/terms" class="block text-yellow-200 underline">利用規約</a>
+          <a href="/unei" class="block text-yellow-200 underline">運営</a>
         </div>
       </div>
     </div>

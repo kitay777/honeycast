@@ -12,6 +12,8 @@ const props = defineProps({
       { key: 'requests',   label: 'リクエスト',   to: '/admin/requests' },
       { key: 'schedules', label: 'スケジュール', to: '/admin/schedules' },
       { key: 'shops', label: 'ショップ管理', to: '/admin/shops' },
+      { key: 'tags', label: 'タグ管理', to: '/admin/tags' },
+      { key: 'ng', label: '禁止ワード', to: '/admin/ng-words' },
     ]),
   },
 })

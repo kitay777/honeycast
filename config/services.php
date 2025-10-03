@@ -34,5 +34,12 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    
+    'line' => [
+        'channel_access_token' => env('LINE_CHANNEL_ACCESS_TOKEN'),
+        'channel_secret' => env('LINE_CHANNEL_SECRET'),
+        'friend_url' => env('LINE_BOT_FRIEND_URL'),
+        'friend_qr'  => env('LINE_BOT_QR_URL'),
+    ],
 
 ];

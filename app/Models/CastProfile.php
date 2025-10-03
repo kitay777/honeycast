@@ -58,4 +58,7 @@ class CastProfile extends Model
     {
         return $this->hasMany(\App\Models\CastPhoto::class)->orderBy('sort_order');
     }
+    public function tagsRel() {   // 名前衝突回避のため tagsRel に
+    return $this->belongsToMany(\App\Models\Tag::class, 'cast_profile_tag')->withTimestamps();
+    }
 }

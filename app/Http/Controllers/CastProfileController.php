@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use App\Models\CastPhotoViewPermission; 
+use App\Models\Tag;
+use App\Rules\NoProhibitedWords;
+
 
 class CastProfileController extends Controller
 {
@@ -54,6 +57,9 @@ class CastProfileController extends Controller
                 ->latest()->take(50)->get();
         }
 
+        $selectedIds = $profile->tagsRel()->pluck('tags.id')->toArray();
+        $availableTags = Tag::where('is_active',true)->orderBy('sort_order')->orderBy('name')
+        ->get(['id','name']);
         // タグ配列化（文字列でも壊れない）
         $tags = $profile->tags;
         if (!is_array($tags)) {
@@ -82,16 +88,21 @@ class CastProfileController extends Controller
             'alcohol'    => $profile->alcohol,
             'mbti'       => $profile->mbti,
             'area'       => $profile->area,
-            'tags'       => $tags,
             'freeword'   => $profile->freeword,
             'photo_path' => $profile->photo_path, // 後方互換（表紙）
             'photos'     => $photos,              // ギャラリー
+            'tag_ids' => $selectedIds,          // ★ 追加
+            'tags'    => $profile->tagsRel()
+                          ->select('tags.id as id','tags.name')   // ← ここがポイント
+                  ->orderBy('tags.name')
+                  ->get(),
         ];
 
         return Inertia::render('Cast/ProfileEdit', [
             'cast' => $cast,
             'pendingPermissions' => $pendingPermissions,
             'pendingPhotoPermissions'  => $pendingPhotoPermissions,
+            'available_tags' => $availableTags,
         ]);
     }
 
@@ -100,7 +111,7 @@ class CastProfileController extends Controller
         $user = Auth::user();
 
         $data = $request->validate([
-            'nickname'   => ['nullable', 'string', 'max:255'],
+            'nickname'   => ['nullable', 'string', 'max:255', new NoProhibitedWords],
             'rank'       => ['nullable', 'integer', 'min:0', 'max:99'],
             'age'        => ['nullable', 'integer', 'min:18', 'max:99'],
             'height_cm'  => ['nullable', 'integer', 'min:120', 'max:220'],
@@ -111,7 +122,7 @@ class CastProfileController extends Controller
             'area'       => ['nullable', 'string', 'max:255'],
             'tags'       => ['nullable', 'array'],
             'tags.*'     => ['string', 'max:30'],
-            'freeword'   => ['nullable', 'string', 'max:2000'],
+            'freeword'   => ['nullable', 'string', 'max:2000', new NoProhibitedWords],
 
             // 旧：単発アップロード互換
             'photo'      => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:4096'],
@@ -125,13 +136,24 @@ class CastProfileController extends Controller
             'orders.*.id'    => ['integer'],
             'orders.*.order' => ['integer'],
             'primary_photo_id' => ['nullable','integer'],
+
+            'tag_ids' => ['sometimes','array'],
+            'tag_ids.*' => ['integer','exists:tags,id'],
         ]);
 
         $profile = CastProfile::firstOrCreate(['user_id' => $user->id]);
 
         // ▼ 基本プロフを更新（ここでは画像以外）
         $profile->fill($data)->save();
-
+        if ($request->has('tag_ids')) {
+        $profile->tagsRel()->sync($request->input('tag_ids', []));
+        }
+        if ($request->filled('tags') && is_array($request->input('tags'))) {
+        $names = array_filter($request->input('tags'), fn($v)=>trim((string)$v)!=='');
+        $ids = \App\Models\Tag::whereIn('name',$names)->pluck('id')->all();
+        $profile->tagsRel()->sync($ids);
+        }
+        // ▼ 写真関連の更新はトランザクションでまとめて
         DB::transaction(function () use ($request, $profile, &$data) {
 
             // a) 旧：単発 photo → 既存は消さず「追加」扱い。初回のみ表紙にする

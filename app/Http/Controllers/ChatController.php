@@ -8,9 +8,24 @@ use App\Models\ChatMessage;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use App\Models\CastProfile;
 
 class ChatController extends Controller
 {
+    public function start(Request $request, CastProfile $cast, \App\Http\Controllers\MessageController $messages)
+    {
+        abort_unless(Auth::check(), 403);
+
+        // MessageController@start が想定する相手IDのパラメータ名に合わせて変更してください
+        // 例1) partner_id / 例2) target_user_id / 例3) user_id など
+        $request->request->add([
+            'partner_id' => $cast->user_id,   // ←★ ここはあなたの実装に合わせて
+        ]);
+
+        // そのまま既存のメッセージ開始処理へ委譲
+        return $messages->start($request);
+    }
     // 一覧
 public function index(Request $request)
 {

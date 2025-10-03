@@ -27,7 +27,40 @@ use App\Events\PingPong;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Auth\CastRegisterController;
 use App\Http\Controllers\CastPhotoPermissionController;
+use App\Http\Controllers\TermsController;
+// routes/web.php
+use App\Http\Controllers\LineLinkController;
+use App\Http\Controllers\LineWebhookController;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as VerifyCsrfTokenMiddleware;
 
+
+Route::middleware(['auth','verified'])->group(function () {
+    Route::post('/line/link/start',       [LineLinkController::class,'start'])->name('line.link.start');
+    Route::get ('/line/link/status',      [LineLinkController::class,'status'])->name('line.link.status');
+    Route::post('/line/push/test',        [LineLinkController::class,'pushTest'])->name('line.push.test');
+    Route::delete('/line/link/disconnect',[LineLinkController::class,'disconnect'])->name('line.link.disconnect');
+});
+
+Route::post('/line/webhook', [LineWebhookController::class, 'handle'])
+    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class])
+    ->name('line.webhook');
+
+Route::post('/line/webhook', [LineWebhookController::class, 'handle'])
+    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class])
+    ->name('line.webhook');
+
+Route::post('/line/webhook', [\App\Http\Controllers\LineWebhookController::class, 'handle']);
+
+Route::get('/terms', [TermsController::class, 'show'])->name('terms');
+Route::get('/unei', [TermsController::class, 'unei'])->name('unei');
+Route::post('/casts/{cast}/chat/start', [\App\Http\Controllers\ChatController::class, 'start'])
+    ->middleware(['auth','verified'])
+    ->name('casts.startChat');
+// ログイン中の再確認＆同意
+Route::middleware(['auth','verified'])->group(function () {
+    Route::get('/terms/review',  [TermsController::class, 'review'])->name('terms.review');
+    Route::post('/terms/accept', [TermsController::class, 'accept'])->name('terms.accept');
+});
 Route::middleware(['auth'])->group(function () {
     Route::post('/photos/{castPhoto}/unblur-requests', [CastPhotoPermissionController::class, 'store'])
         ->name('photos.unblur.request');
@@ -125,7 +158,16 @@ Route::middleware(['auth','verified'])
 Route::middleware(['auth','verified','can:admin'])
     ->prefix('admin')->name('admin.')
     ->group(function () {
-
+        Route::get   ('/ng-words',        [\App\Http\Controllers\Admin\NgWordController::class,'index'])->name('ng.index');
+        Route::post  ('/ng-words',        [\App\Http\Controllers\Admin\NgWordController::class,'store'])->name('ng.store');
+        Route::put   ('/ng-words/{word}', [\App\Http\Controllers\Admin\NgWordController::class,'update'])->name('ng.update');
+        Route::delete('/ng-words/{word}', [\App\Http\Controllers\Admin\NgWordController::class,'destroy'])->name('ng.destroy');
+    
+        Route::get('/tags', [\App\Http\Controllers\Admin\TagController::class, 'index'])->name('tags.index');
+        Route::post('/tags', [\App\Http\Controllers\Admin\TagController::class, 'store'])->name('tags.store');
+        Route::put('/tags/{tag}', [\App\Http\Controllers\Admin\TagController::class, 'update'])->name('tags.update');
+        Route::delete('/tags/{tag}', [\App\Http\Controllers\Admin\TagController::class, 'destroy'])->name('tags.destroy');        
+        
         // ★ メール内の1クリック応答（署名付き）
         Route::get('/invitations/respond/{assignment}/{decision}',
             [\App\Http\Controllers\Cast\InvitationController::class, 'respondSigned'])
