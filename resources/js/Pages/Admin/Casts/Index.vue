@@ -162,7 +162,7 @@ async function sendLine(castUserId) {
           </div>
           <div class="flex items-center gap-2">
             <Link :href="`/admin/users?q=${encodeURIComponent(c.user?.email || '')}`"
-                  class="text-xs px-2 py-1 rounded border">キャストを見る</Link>
+                  class="text-xs px-2 py-1 rounded border">ユーザーを見る</Link>
             <button @click="selectForEdit(c)" class="text-sm px-2 py-1 rounded bg-blue-600 text-white">編集</button>
             <button @click="openLineAndScroll(c)" class="text-sm px-2 py-1 rounded bg-emerald-600 text-white">LINE送信</button>
             <button @click="remove(c)" class="text-sm px-2 py-1 rounded bg-red-600 text-white">削除</button>
