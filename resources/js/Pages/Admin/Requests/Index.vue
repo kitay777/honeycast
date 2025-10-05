@@ -173,7 +173,7 @@ function updateStatus(reqId, newStatus){
             <select v-model="form.cast_profile_id" class="w-full border rounded px-3 py-2">
               <option value="">選択してください</option>
               <option v-for="c in props.casts" :key="c.id" :value="c.id">
-                {{ c.label }} <span v-if="c.email" class="text-gray-400">({{ c.email }})</span>
+                {{ c.label }} <span v-if="c.email" class="text-gray-400">（{{ c.email }}）</span>
               </option>
             </select>
           </div>
