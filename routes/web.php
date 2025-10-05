@@ -33,9 +33,19 @@ use App\Http\Controllers\LineLinkController;
 use App\Http\Controllers\LineWebhookController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as VerifyCsrfTokenMiddleware;
 
+// routes/web.php
+// routes/web.php （要: 認可ミドルウェア）
+use App\Http\Controllers\AdminLineController;
+
+Route::get('/line/link/peek', [\App\Http\Controllers\LineLinkController::class, 'peek'])
+    ->name('line.link.peek');
+Route::post('/admin/users/{user}/line/push', [AdminLineController::class, 'push'])
+    ->name('admin.users.line.push');
+
+
 
 Route::middleware(['auth','verified'])->group(function () {
-    Route::post('/line/link/start',       [LineLinkController::class,'start'])->name('line.link.start');
+    Route::post('/line/link/start', [LineLinkController::class, 'start'])->name('line.link.start');
     Route::get ('/line/link/status',      [LineLinkController::class,'status'])->name('line.link.status');
     Route::post('/line/push/test',        [LineLinkController::class,'pushTest'])->name('line.push.test');
     Route::delete('/line/link/disconnect',[LineLinkController::class,'disconnect'])->name('line.link.disconnect');
@@ -44,12 +54,6 @@ Route::middleware(['auth','verified'])->group(function () {
 Route::post('/line/webhook', [LineWebhookController::class, 'handle'])
     ->withoutMiddleware([VerifyCsrfTokenMiddleware::class])
     ->name('line.webhook');
-
-Route::post('/line/webhook', [LineWebhookController::class, 'handle'])
-    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class])
-    ->name('line.webhook');
-
-Route::post('/line/webhook', [\App\Http\Controllers\LineWebhookController::class, 'handle']);
 
 Route::get('/terms', [TermsController::class, 'show'])->name('terms');
 Route::get('/unei', [TermsController::class, 'unei'])->name('unei');

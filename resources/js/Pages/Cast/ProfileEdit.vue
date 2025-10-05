@@ -4,18 +4,29 @@ import AppLayout from "@/Layouts/AppLayout.vue"
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3"
 import { ref, computed } from "vue"
 
+/** route() が無い/解決失敗でもフォールバックURLで必ず動かす */
+const urlFor = (name, params = {}, fallback = "") => {
+  try {
+    if (typeof route === "function") {
+      const u = route(name, params)
+      if (typeof u === "string" && u.length) return u
+    }
+  } catch {}
+  return fallback
+}
+
 /* ====== props ====== */
 const props = defineProps({
-  cast: { type: Object, default: null },                 // { id, nickname, ..., photo_path, photos?: [{id,url,sort_order,is_primary}] }
-  pendingPermissions: { type: Array, default: () => [] }, // ぼかし解除の承認待ち一覧
-  available_tags: { type: Array, default: () => [] }, // [{id,name}]
+  cast: { type: Object, default: null },
+  pendingPermissions: { type: Array, default: () => [] },
+  available_tags: { type: Array, default: () => [] },
   pendingPhotoPermissions: { type: Array, default: () => [] },
 })
 
 /* ====== 安全な初期化 ====== */
 const p = computed(() => props.cast ?? {})
 
-/* tags を配列化（サーバが文字列でも崩れないように） */
+/* tags 初期化（サーバが文字列でも安全） */
 const initialTags = Array.isArray(p.value?.tags)
   ? p.value.tags
   : (p.value?.tags ? String(p.value.tags).split(/[\s,，、]+/).filter(Boolean) : [])
@@ -34,8 +45,7 @@ const form = useForm({
   area: p.value?.area ?? "",
   tag_ids: Array.isArray(props.cast?.tag_ids) ? [...props.cast.tag_ids] : [],
   freeword: p.value?.freeword ?? "",
-  // 旧・単発アップロード互換（使わなければ空のまま）
-  photo: null,
+  photo: null, // 旧・単発互換
 })
 
 /* ====== 写真管理（複数） ====== */
@@ -68,14 +78,13 @@ const revokePreviewUrl = (src) => {
   } catch (_) {}
 }
 
-/* 追加 */
+/* 追加/並び替え/メイン/削除 */
 const onAddPhotos = (e) => {
   const files = Array.from(e.target.files || [])
   if (!files.length) return
   newFiles.value.push(...files)
-  e.target.value = "" // 同じファイル選択で再発火させる
+  e.target.value = ""
 }
-/* 並び替え */
 const move = (idx, dir) => {
   const to = idx + dir
   if (to < 0 || to >= existing.value.length) return
@@ -83,35 +92,31 @@ const move = (idx, dir) => {
   existing.value[idx] = existing.value[to]
   existing.value[to] = a
 }
-/* メイン */
 const setPrimary = (ph) => {
   if (ph._delete) return
   primaryId.value = ph.id
 }
-/* 削除トグル */
 const toggleDelete = (ph) => {
   ph._delete = !ph._delete
   if (ph._delete && primaryId.value === ph.id) primaryId.value = null
 }
 
 /* ====== ぼかし解除承認/否認 ====== */
-const r = (...args) => (typeof route === "function" ? route(...args) : null)
 const approve = (permId) => {
   const id = form.id; if (!id) return
-  if (r) router.post(r("casts.unblur.approve", { castProfile: id, permission: permId }), { expires_at: null })
-  else   router.post(`/casts/${id}/unblur-requests/${permId}/approve`, { expires_at: null })
+  const url = urlFor('casts.unblur.approve', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/approve`)
+  router.post(url, { expires_at: null })
 }
 const deny = (permId) => {
   const id = form.id; if (!id) return
-  if (r) router.post(r("casts.unblur.deny", { castProfile: id, permission: permId }))
-  else   router.post(`/casts/${id}/unblur-requests/${permId}/deny`)
+  const url = urlFor('casts.unblur.deny', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/deny`)
+  router.post(url)
 }
 
 /* ====== 送信 ====== */
 const submit = () => {
   form.transform((data) => {
     const fd = new FormData()
-    // 基本
     fd.append("nickname", data.nickname ?? "")
     if (data.rank !== "") fd.append("rank", data.rank)
     if (data.age !== "") fd.append("age", data.age)
@@ -121,99 +126,97 @@ const submit = () => {
     fd.append("alcohol", data.alcohol ?? "")
     fd.append("mbti", (data.mbti ?? "").toString().toUpperCase())
     fd.append("area", data.area ?? "")
-    ;
-    (data.tag_ids || []).forEach(id => fd.append("tag_ids[]", id))
+    ;(data.tag_ids || []).forEach(id => fd.append("tag_ids[]", id))
     fd.append("freeword", data.freeword ?? "")
 
-    // 旧・単発（互換）
     if (data.photo instanceof File) fd.append("photo", data.photo)
-
-    // 追加（複数）
     newFiles.value.forEach(f => fd.append("photos[]", f))
 
-    // 並び（1..N）
     existing.value.forEach((ph, i) => {
       if (!ph.id) return
       fd.append(`orders[${i}][id]`, ph.id)
       fd.append(`orders[${i}][order]`, i + 1)
     })
-
-    // 削除
     existing.value.filter(ph => ph._delete && ph.id).forEach(ph => fd.append("delete_photo_ids[]", ph.id))
-
-    // メイン
     if (primaryId.value) fd.append("primary_photo_id", primaryId.value)
-
     return fd
-  }).post(r ? r("cast.profile.update") : "/cast/profile", {
+  }).post(urlFor('cast.profile.update', {}, '/cast/profile'), {
     forceFormData: true,
     preserveScroll: true,
-    onSuccess: () => {
-      newFiles.value = []
-      // 反映を強くしたい場合: router.reload({ only: ['cast'] })
-    }
+    onSuccess: () => { newFiles.value = [] }
   })
 }
 
-/* ====== 補助 ====== 
-const candidateTags = [
-  "ギャル","清楚","アイドル","オタク","可愛い","キレイ","高身長","低身長",
-  "スレンダー","細身","グラマー","ロングヘア","ショートヘア","金髪","茶髪","黒髪","明るい","ワイワイ"
-]
-const toggleTag = (t) => {
-  const i = form.tags.indexOf(t)
-  if (i >= 0) form.tags.splice(i, 1)
-  else form.tags.push(t)
-}
-  */
+/* ====== タグ ====== */
 const toggleTagId = (id) => {
-    const i = form.tag_ids.indexOf(id)
-    if (i>=0) form.tag_ids.splice(i,1); else form.tag_ids.push(id)
+  const i = form.tag_ids.indexOf(id)
+  if (i>=0) form.tag_ids.splice(i,1); else form.tag_ids.push(id)
 }
 
+/* ====== ページ/ユーザー ====== */
 const page = usePage()
-const authedUser = computed(() => page.props?.auth?.user ?? null)
-// 写真ごとの承認/否認
+const authedUser = computed(() => page.props?.value?.auth?.user ?? null)
+
+/* ====== 写真ごとの承認/否認 ====== */
 const approvePhoto = (perm) => {
   const photoId = perm.photo_id
   if (!photoId) return
-  if (r) router.post(r("photos.unblur.approve", { castPhoto: photoId, permission: perm.id }), { expires_at: null })
-  else   router.post(`/photos/${photoId}/unblur-requests/${perm.id}/approve`, { expires_at: null })
+  const url = urlFor('photos.unblur.approve', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/approve`)
+  router.post(url, { expires_at: null })
 }
 const denyPhoto = (perm) => {
   const photoId = perm.photo_id
   if (!photoId) return
-  if (r) router.post(r("photos.unblur.deny", { castPhoto: photoId, permission: perm.id }))
-  else   router.post(`/photos/${photoId}/unblur-requests/${perm.id}/deny`)
+  const url = urlFor('photos.unblur.deny', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/deny`)
+  router.post(url)
 }
 
-/* ====== LINE 連携（通知配信用） ====== */
-// props.cast.line_user_id が入っていれば「連携済み」とみなす前提
+/* ====== LINE 連携（リンクは常時表示） ====== */
 const line = ref({
   linked: !!(props.cast?.line_user_id),
-  displayName: props.cast?.line_display_name ?? null, // サーバで取ってあれば
+  displayName: props.cast?.line_display_name ?? null,
   userId: props.cast?.line_user_id ?? null,
 })
 
 const lineLinking = ref(false)
-const lineCode = ref(null)          // 発行した連携コード（ペアリング方式）
-const lineBotUrl = ref(null)        // 公式アカウント招待URL（例: https://line.me/R/ti/p/@xxxx）
-const lineBotQr  = ref(null)        // 友だち追加QR画像URL（任意）
+const lineCode = ref(null)
+const lineBotUrl = ref(null)
+const lineBotQr  = ref(null)
 
-// 連携コードを発行（サーバ側で一時テーブルに user_id と code を保存し、
-// Webhookで code を受け取ったら event.source.userId とひも付ける実装）
+/* サーバ共有 line_env、Vite 変数でフォールバック */
+const envBotUrl = computed(() => page.props?.value?.line_env?.bot_url ?? null)
+const envBotQr  = computed(() => page.props?.value?.line_env?.bot_qr  ?? null)
+const viteBotUrl = import.meta.env.VITE_LINE_BOT_ADD_URL || null
+const viteBotQr  = import.meta.env.VITE_LINE_BOT_QR || null
+/* 実使用URL/QR（応答URL → line_env → Vite） */
+const addUrl = computed(() => lineBotUrl.value || envBotUrl.value || viteBotUrl)
+const addQr  = computed(() => lineBotQr.value  || envBotQr.value  || viteBotQr)
+
+/** 連携コード発行（POSTのみ。開くのは上のリンクが担当） */
 const startLineLink = async () => {
+  if (lineLinking.value) return
+  lineLinking.value = true
   try {
-    lineLinking.value = true
-    const url = r ? r('line.link.start') : '/line/link/start'
+    const url = urlFor('line.link.start', {}, '/line/link/start')
     await router.post(url, {}, {
       preserveScroll: true,
-      onSuccess: (page) => {
-        const payload = page?.props?.line ?? page?.props?.flash?.line ?? null
-        // 返却想定: { code: 'ABC123', bot_url: 'https://...', bot_qr: 'https://...' }
-        lineCode.value   = payload?.code ?? null
-        lineBotUrl.value = payload?.bot_url ?? null
-        lineBotQr.value  = payload?.bot_qr ?? null
+      onSuccess: (inertiaPage) => {
+        // まず flash で受け取る（入っていれば即反映）
+        const props = inertiaPage?.props ?? page.props?.value ?? {}
+        const payload = props.line ?? props.flash?.line ?? null
+        if (payload) {
+          lineCode.value   = payload?.code ?? null
+          lineBotUrl.value = payload?.bot_url ?? null
+          lineBotQr.value  = payload?.bot_qr ?? null
+        }
+      },
+      onError: (errors) => {
+        console.error('[line.link.start] failed', errors)
+        alert('連携コードの発行に失敗しました（ルート未定義/CSRF/権限など）。')
+      },
+      onFinish: async () => {
+        // ★ 最終的に peek で“必ず”最新を反映（flashが無くてもOK）
+        await refreshLineCode()
       },
     })
   } finally {
@@ -221,13 +224,26 @@ const startLineLink = async () => {
   }
 }
 
-// 連携ステータス確認（Webhook側で code が届いたら DB に line_user_id を保存 → ここで反映）
+
+const refreshLineCode = async () => {
+  try {
+    const url = urlFor('line.link.peek', {}, '/line/link/peek')
+    // Inertiaのrouterでも良いですが、素のfetchが手軽です
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) return
+    const json = await res.json()
+    lineCode.value   = json?.code ?? null
+    lineBotUrl.value = json?.bot_url ?? null
+    lineBotQr.value  = json?.bot_qr ?? null
+  } catch (e) { console.error('refreshLineCode failed', e) }
+}
+
 const checkLineStatus = async () => {
-  const url = r ? r('line.link.status') : '/line/link/status'
+  const url = urlFor('line.link.status', {}, '/line/link/status')
   await router.get(url, {}, {
     preserveScroll: true,
-    onSuccess: (page) => {
-      const st = page?.props?.line_status ?? null
+    onSuccess: (resp) => {
+      const st = resp?.props?.line_status ?? page.props?.value?.line_status ?? null
       if (st?.linked) {
         line.value.linked = true
         line.value.userId = st.user_id ?? null
@@ -237,22 +253,35 @@ const checkLineStatus = async () => {
   })
 }
 
-// テスト通知
 const sendLineTest = async () => {
-  const url = r ? r('line.push.test') : '/line/push/test'
-  await router.post(url, {}, { preserveScroll: true })
+  const url = urlFor('line.push.test', {}, '/line/push/test')
+  await router.post(url, {}, {
+    preserveScroll: true,
+    onSuccess: (inertiaPage) => {
+      const props = inertiaPage?.props ?? page.props?.value ?? {}
+      const ok = props.flash?.success ?? props.success ?? null
+      const err = props.flash?.error ?? props.error ?? null
+      if (ok) alert(ok)
+      if (err) alert(err)
+    },
+    onError: () => alert('テスト通知の送信に失敗しました'),
+  })
 }
 
-// 連携解除
 const disconnectLine = async () => {
-  const url = r ? r('line.link.disconnect') : '/line/link/disconnect'
-  await router.delete(url, { preserveScroll: true, onSuccess: () => {
-    line.value = { linked: false, displayName: null, userId: null }
-    lineCode.value = null
-  }})
+  const url = urlFor('line.link.disconnect', {}, '/line/link/disconnect')
+  await router.delete(url, {
+    preserveScroll: true,
+    onSuccess: () => {
+      line.value = { linked: false, displayName: null, userId: null }
+      lineCode.value = null
+      lineBotUrl.value = null
+      lineBotQr.value  = null
+    }
+  })
 }
 
-// クリップボード
+/* クリップボード */
 const copy = async (text) => {
   try { await navigator.clipboard.writeText(text) } catch {}
 }
@@ -261,10 +290,13 @@ const copy = async (text) => {
 <template>
   <AppLayout>
     <Head title="キャストプロフィール編集" />
-    <div class="min-h-dvh w-screen flex items-center justify-center bg-black">
-      <div class="relative w-full h-dvh md:w-[390px] md:h-[844px] mx-auto
-                  bg-[url('/assets/imgs/back.png')] bg-no-repeat bg-center bg-[length:100%_100%] overflow-y-auto">
-        <div class="px-6 pt-8 pb-24 text-white/90">
+    <!-- ★ Safari 対策：外側は単純なflex、内側に max-h-dvh + min-h-0 + overflow-y-auto -->
+    <div class="min-h-dvh w-screen bg-black flex justify-center md:py-6">
+      <div
+        class="relative w-full max-w-[390px] max-h-dvh mx-auto
+               bg-[url('/assets/imgs/back.png')] bg-no-repeat bg-center bg-[length:100%_100%]
+               overflow-y-auto min-h-0">
+        <div class="px-6 py-8 text-white/90">
 
           <h1 class="text-2xl font-semibold mb-6">プロフィール編集</h1>
 
@@ -276,36 +308,38 @@ const copy = async (text) => {
                 <div class="text-sm opacity-80">申請者: {{ pmt.viewer.name }} (ID: {{ pmt.viewer.id }})</div>
                 <div class="text-sm">メッセージ: {{ pmt.message || "（なし）" }}</div>
                 <div class="mt-2 space-x-2">
-                  <button @click="approve(pmt.id)" class="bg-green-600 text-white rounded px-3 py-1">承認</button>
-                  <button @click="deny(pmt.id)" class="bg-gray-500 text-white rounded px-3 py-1">否認</button>
+                  <button type="button" @click="approve(pmt.id)" class="bg-green-600 text-white rounded px-3 py-1">承認</button>
+                  <button type="button" @click="deny(pmt.id)" class="bg-gray-500 text-white rounded px-3 py-1">否認</button>
                 </div>
               </li>
             </ul>
           </div>
-<!-- ★ 承認待ち（ぼかし解除：写真） -->
-<div v-if="(pendingPhotoPermissions?.length || 0) > 0" class="mb-6">
-  <h3 class="font-bold mt-2 mb-2">未処理の閲覧申請（写真）</h3>
-  <ul class="grid grid-cols-1 gap-3">
-    <li v-for="perm in pendingPhotoPermissions" :key="perm.id"
-        class="p-3 rounded border border-white/20 bg-white/5 flex items-center gap-3">
-      <img v-if="perm.thumb" :src="perm.thumb" class="w-20 h-14 object-cover rounded" />
-      <div class="flex-1">
-        <div class="text-sm">
-          申請者: <span class="opacity-90">{{ perm.viewer?.name }} (ID: {{ perm.viewer?.id }})</span>
-        </div>
-        <div class="text-xs opacity-80">メッセージ: {{ perm.message || '（なし）' }}</div>
-        <div class="text-[11px] opacity-60">申請日時: {{ perm.created_at }}</div>
-      </div>
-      <div class="shrink-0 space-x-2">
-        <button @click="approvePhoto(perm)" class="bg-green-600 text-white rounded px-3 py-1 text-sm">承認</button>
-        <button @click="denyPhoto(perm)"    class="bg-gray-500  text-white rounded px-3 py-1 text-sm">否認</button>
-      </div>
-    </li>
-  </ul>
-  <div class="mt-1 text-xs opacity-70">
-    ※ 写真の承認は、その写真だけ非ぼかし表示になります（プロフィール全体の許可とは独立）。
-  </div>
-</div>
+
+          <!-- 承認待ち（写真） -->
+          <div v-if="(pendingPhotoPermissions?.length || 0) > 0" class="mb-6">
+            <h3 class="font-bold mt-2 mb-2">未処理の閲覧申請（写真）</h3>
+            <ul class="grid grid-cols-1 gap-3">
+              <li v-for="perm in pendingPhotoPermissions" :key="perm.id"
+                  class="p-3 rounded border border-white/20 bg-white/5 flex items-center gap-3">
+                <img v-if="perm.thumb" :src="perm.thumb" class="w-20 h-14 object-cover rounded" />
+                <div class="flex-1">
+                  <div class="text-sm">
+                    申請者: <span class="opacity-90">{{ perm.viewer?.name }} (ID: {{ perm.viewer?.id }})</span>
+                  </div>
+                  <div class="text-xs opacity-80">メッセージ: {{ perm.message || '（なし）' }}</div>
+                  <div class="text-[11px] opacity-60">申請日時: {{ perm.created_at }}</div>
+                </div>
+                <div class="shrink-0 space-x-2">
+                  <button type="button" @click="approvePhoto(perm)" class="bg-green-600 text-white rounded px-3 py-1 text-sm">承認</button>
+                  <button type="button" @click="denyPhoto(perm)"    class="bg-gray-500  text-white rounded px-3 py-1 text-sm">否認</button>
+                </div>
+              </li>
+            </ul>
+            <div class="mt-1 text-xs opacity-70">
+              ※ 写真の承認は、その写真だけ非ぼかし表示になります（プロフィール全体の許可とは独立）。
+            </div>
+          </div>
+
           <!-- スケジュール・その他リンク -->
           <div class="mb-4 flex flex-wrap gap-4 items-center">
             <Link v-if="form.id" :href="`/casts/${form.id}/schedule`" class="text-sm underline text-yellow-200">
@@ -318,72 +352,76 @@ const copy = async (text) => {
               ● ログアウト
             </Link>
           </div>
-          <!-- ============== LINE 通知（登録／連携） ============== -->
-<div class="mb-6 p-4 rounded border border-white/20 bg-white/5">
-  <div class="flex items-center justify-between mb-2">
-    <h3 class="font-semibold">LINEで通知を受け取る</h3>
-    <span v-if="line.linked" class="text-xs px-2 py-1 rounded bg-green-600 text-white">
-      連携済み
-    </span>
-  </div>
 
-  <!-- 連携済みビュー -->
-  <div v-if="line.linked" class="space-y-2">
-    <div class="text-sm opacity-90">
-      {{ line.displayName ? `LINE: ${line.displayName}` : 'LINEアカウント連携済み' }}
-    </div>
-    <div class="flex gap-2">
-      <button @click="sendLineTest" class="px-3 py-1 rounded bg-yellow-200 text-black text-sm">テスト通知を送る</button>
-      <button @click="disconnectLine" class="px-3 py-1 rounded bg-gray-600 text-white text-sm">連携解除</button>
-    </div>
-    <p class="text-xs opacity-70">※ ブロックされている場合は送信できません。解除後に再連携が必要です。</p>
-  </div>
+          <!-- ============== LINE 連携 ============== -->
+          <div class="mb-6 p-4 rounded border border-white/20 bg-white/5">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold">LINEで通知を受け取る</h3>
+              <span v-if="line.linked" class="text-xs px-2 py-1 rounded bg-green-600 text-white">
+                連携済み
+              </span>
+            </div>
 
-  <!-- 未連携ビュー -->
-  <div v-else class="space-y-3">
-    <ol class="list-decimal list-inside space-y-2 text-sm opacity-90">
-      <li>下のボタンから <span class="font-semibold">公式アカウントを友だち追加</span> してください。</li>
-      <li>「連携コードを発行」を押して表示された <span class="font-semibold">コード</span> を、LINEのトークで送信してください。</li>
-      <li>送信後に <span class="font-semibold">「連携を確認」</span> を押すと連携が完了します。</li>
-    </ol>
+            <!-- 連携済み -->
+            <div v-if="line.linked" class="space-y-2">
+              <div class="text-sm opacity-90">
+                {{ line.displayName ? `LINE: ${line.displayName}` : 'LINEアカウント連携済み' }}
+              </div>
+              <div class="flex gap-2">
+                <button type="button" @click="sendLineTest" class="px-3 py-1 rounded bg-yellow-200 text-black text-sm">テスト通知を送る</button>
+                <button type="button" @click="disconnectLine" class="px-3 py-1 rounded bg-gray-600 text-white text-sm">連携解除</button>
+              </div>
+              <p class="text-xs opacity-70">※ ブロックされている場合は送信できません。解除後に再連携が必要です。</p>
+            </div>
 
-    <div class="flex flex-wrap items-center gap-2">
-      <a v-if="lineBotUrl" :href="lineBotUrl" target="_blank"
-         class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">友だち追加（LINEを開く）</a>
-      <button v-else @click="startLineLink" :disabled="lineLinking"
-              class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">
-        友だち追加リンクを取得
-      </button>
+            <!-- 未連携 -->
+            <div v-else class="space-y-3">
+              <ol class="list-decimal list-inside space-y-2 text-sm opacity-90">
+                <li>下のボタンから <span class="font-semibold">公式アカウントを友だち追加</span> してください。</li>
+                <li>「連携コードを発行」を押して表示された <span class="font-semibold">コード</span> を、LINEのトークで送信してください。</li>
+                <li>送信後に <span class="font-semibold">「連携を確認」</span> を押すと連携が完了します。</li>
+              </ol>
 
-      <button @click="startLineLink" :disabled="lineLinking"
-              class="px-3 py-1 rounded bg-yellow-200 text-black text-sm">
-        連携コードを発行
-      </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <!-- 初期表示から必ず開ける（応答URL→line_env→Vite） -->
+                <a v-if="addUrl"
+                   :href="addUrl"
+                   target="_blank" rel="noopener"
+                   class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">
+                  友だち追加（LINEを開く）
+                </a>
 
-      <button @click="checkLineStatus"
-              class="px-3 py-1 rounded bg-white/10 text-white text-sm">
-        連携を確認
-      </button>
-    </div>
+                <!-- 連携コード発行（POSTのみ。開くのは上のリンクが担当） -->
+                <button type="button"
+                        @click="startLineLink"
+                        :disabled="lineLinking"
+                        class="px-3 py-1 rounded bg-yellow-200 text-black text-sm">
+                  連携コードを発行
+                </button>
 
-    <div v-if="lineBotQr" class="pt-2">
-      <img :src="lineBotQr" class="w-32 h-32 object-contain border border-white/10 rounded" alt="LINE QR" />
-      <div class="text-xs opacity-70 mt-1">QRを読み取って友だち追加も可能です。</div>
-    </div>
+                <button type="button"
+                        @click="checkLineStatus"
+                        class="px-3 py-1 rounded bg-white/10 text-white text-sm">
+                  連携を確認
+                </button>
+              </div>
 
-    <div v-if="lineCode" class="p-3 rounded bg-black/50 border border-white/10">
-      <div class="text-xs opacity-70 mb-1">あなたの連携コード</div>
-      <div class="flex items-center gap-2">
-        <code class="text-base tracking-widest">{{ lineCode }}</code>
-        <button @click="copy(lineCode)" class="px-2 py-0.5 text-xs rounded bg-white/10">コピー</button>
-      </div>
-      <div class="text-xs opacity-70 mt-2">※ このコードを、LINEの公式アカウントのトークに送ってください。</div>
-    </div>
+              <div v-if="addQr" class="pt-2">
+                <img :src="addQr" class="w-32 h-32 object-contain border border-white/10 rounded" alt="LINE QR" />
+                <div class="text-xs opacity-70 mt-1">QRを読み取って友だち追加も可能です。</div>
+              </div>
 
-  </div>
-</div>
-<!-- ================================================ -->
-
+              <div v-if="lineCode" class="p-3 rounded bg-black/50 border border-white/10">
+                <div class="text-xs opacity-70 mb-1">あなたの連携コード</div>
+                <div class="flex items-center gap-2">
+                  <code class="text-base tracking-widest">{{ lineCode }}</code>
+                  <button type="button" @click="copy(lineCode)" class="px-2 py-0.5 text-xs rounded bg-white/10">コピー</button>
+                </div>
+                <div class="text-xs opacity-70 mt-2">※ このコードを、LINEの公式アカウントのトークに送ってください。</div>
+              </div>
+            </div>
+          </div>
+          <!-- ===================================== -->
 
           <!-- 基本プロフィール -->
           <form @submit.prevent="submit" class="space-y-5">
@@ -485,7 +523,7 @@ const copy = async (text) => {
                   <img :src="ph.url" class="w-full h-28 object-cover" />
                   <div class="absolute top-1 left-1 flex gap-1">
                     <button type="button" @click="move(idx,-1)" class="px-1 py-0.5 text-xs bg-black/50 text-white rounded">↑</button>
-                    <button type="button" @click="move(idx, 1)" class="px-1 py-0.5 text-xs bg-black/50 text-white rounded">↓</button>
+                    <button type="button" @click="move(idx, 1)" class="px-1 py-0.5 text-xs bg-black/50 text白 rounded">↓</button>
                   </div>
                   <div class="absolute top-1 right-1">
                     <button type="button"

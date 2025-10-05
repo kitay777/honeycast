@@ -44,7 +44,12 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),
-                'line'    => fn () => $request->session()->get('line'),   // ★追加
+                'line'    => fn () => $request->session()->get('line'),        // ★ 追加
+                'line_status' => fn () => $request->session()->get('line_status'), // 使うなら
+            ],
+            'line_env' => [
+                'bot_url' => config('services.line.bot_add_url'), // 例: https://line.me/R/ti/p/@YOUR_BOT_ID
+                'bot_qr'  => config('services.line.bot_qr'),      // 任意
             ],
         ];
     }

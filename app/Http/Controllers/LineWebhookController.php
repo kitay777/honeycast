@@ -1,76 +1,96 @@
 <?php
 
-// app/Http/Controllers/LineWebhookController.php
 namespace App\Http\Controllers;
 
-use App\Models\LineLinkCode;
-use App\Models\User;
-use App\Services\LineService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class LineWebhookController extends Controller
 {
-    public function handle(Request $req, LineService $line)
+    public function handle(Request $request)
     {
-        $raw = $req->getContent();
-        $sig = $req->header('X-Line-Signature');
+        // 受信ログ（デバッグ用）
+        \Log::info('LINE webhook IN', $request->all());
 
-        if (!$line->verifySignature($raw, $sig)) {
-            Log::warning('LINE signature invalid');
-            return response()->json(['ok'=>false], 400);
-        }
+        $token  = config('services.line.channel_access_token'); // .env: LINE_CHANNEL_ACCESS_TOKEN
+        $events = $request->input('events', []);
 
-        $payload = $req->json()->all();
-        foreach (($payload['events'] ?? []) as $ev) {
-
+        foreach ($events as $ev) {
             $type = $ev['type'] ?? '';
-            $sourceUserId = $ev['source']['userId'] ?? null;
+            if ($type !== 'message') { continue; }
 
-            // 友だち追加/ブロック解除など（軽い挨拶）
-            if ($type === 'follow' && $sourceUserId) {
-                $line->replyText($ev['replyToken'] ?? '', "友だち追加ありがとうございます！\n「連携コード」を送って連携してください。");
+            $msgType = $ev['message']['type'] ?? '';
+            if ($msgType !== 'text') { continue; }
+
+            $text       = (string)($ev['message']['text'] ?? '');
+            $replyToken = $ev['replyToken'] ?? null;
+            $lineUserId = $ev['source']['userId'] ?? null;
+
+            if (!$lineUserId || $text === '') { continue; }
+
+            // --- コード抽出（全角→半角、空白除去、先頭の英数4〜10文字を拾う）---
+            $norm = Str::upper(mb_convert_kana($text, 'as')); // 全角→半角 & 大文字
+            $norm = preg_replace('/\s+/u', '', $norm);
+            // 例： ABC123 ／ ABC-123 ／ 123ABC を拾う
+            if (!preg_match('/([A-Z0-9]{4,10})/', $norm, $m)) {
+                \Log::warning('LINE webhook: no code pattern', ['text' => $text, 'norm' => $norm]);
+                continue;
             }
+            $code = $m[1];
 
-            // 連携コードをトークで受信 → 照合 → ユーザーに紐付け
-            if ($type === 'message' && ($ev['message']['type'] ?? '') === 'text' && $sourceUserId) {
-                $text = trim($ev['message']['text'] ?? '');
-                // 6〜12桁の英数のみをコードとして受け付け
-                if (preg_match('/^[A-Z0-9]{6,12}$/i', $text)) {
-                    $code = strtoupper($text);
-                    $rec = LineLinkCode::where('code', $code)
-                        ->whereNull('used_at')
-                        ->where('expires_at','>', now())
-                        ->first();
+            // --- 有効なコードを検索 ---
+            $pair = DB::table('line_link_codes')
+                ->where('code', $code)
+                ->whereNull('used_at')
+                ->where('expires_at', '>', now())
+                ->orderByDesc('id')
+                ->first();
 
-                    if ($rec) {
-                        $user = User::find($rec->user_id);
-                        if ($user) {
-                            // プロフィール取得（任意）
-                            $profile = $line->getProfile($sourceUserId);
-                            $user->update([
-                                'line_user_id' => $sourceUserId,
-                                'line_display_name' => $profile['displayName'] ?? null,
-                                'line_opt_in_at' => now(),
-                            ]);
-                            $rec->update(['used_at'=>now()]);
-
-                            $line->replyText($ev['replyToken'] ?? '', "連携が完了しました！このLINEに通知を送ります。");
-                            continue;
-                        }
-                    }
-                    $line->replyText($ev['replyToken'] ?? '', "連携コードが無効か、期限切れです。マイページでコードを再発行してください。");
+            if (!$pair) {
+                \Log::warning('LINE webhook: code not found/expired', ['code' => $code]);
+                // 必要なら「コードが無効です」と返信
+                if ($replyToken && $token) {
+                    Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
+                        'replyToken' => $replyToken,
+                        'messages' => [['type' => 'text', 'text' => 'コードが無効です。もう一度「連携コードを発行」からお試しください。']],
+                    ]);
                 }
+                continue;
             }
 
-            // ブロック（unfollow）されたら内部状態を更新したい場合
-            if ($type === 'unfollow' && $sourceUserId) {
-                User::where('line_user_id', $sourceUserId)
-                    ->update(['line_opt_in_at'=>null]); // or nullにする等、運用に合わせて
+            // --- 表示名（任意で取得） ---
+            $displayName = null;
+            if ($token) {
+                $prof = Http::withToken($token)->get("https://api.line.me/v2/bot/profile/{$lineUserId}");
+                if ($prof->successful()) { $displayName = $prof->json('displayName'); }
+            }
+
+            // --- users を更新 ---
+            DB::table('users')->where('id', $pair->user_id)->update([
+                'line_user_id'      => $lineUserId,
+                'line_display_name' => $displayName,
+                'updated_at'        => now(),
+            ]);
+
+            // --- コードを使用済みに ---
+            DB::table('line_link_codes')->where('id', $pair->id)->update([
+                'used_at'    => now(),
+                'updated_at' => now(),
+            ]);
+
+            \Log::info('LINE webhook LINKED', ['user_id' => $pair->user_id, 'line_user_id' => $lineUserId, 'code' => $code]);
+
+            // --- 成功リプライ（ユーザーに分かるように） ---
+            if ($replyToken && $token) {
+                Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
+                    'replyToken' => $replyToken,
+                    'messages' => [['type' => 'text', 'text' => '連携が完了しました。通知を受け取れるようになりました。']],
+                ]);
             }
         }
 
-        return response()->json(['ok'=>true]);
+        return response()->json(['ok' => true]);
     }
 }
