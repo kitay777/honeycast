@@ -6,105 +6,68 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use App\Models\CallRequestCast; // 冒頭で import
 
 class LineWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        // 受信ログ（デバッグ用）
         \Log::info('LINE webhook IN', $request->all());
-
-        $token  = config('services.line.channel_access_token'); // .env: LINE_CHANNEL_ACCESS_TOKEN
+        $token  = config('services.line.channel_access_token');
         $events = $request->input('events', []);
 
         foreach ($events as $ev) {
-            if (($ev['type'] ?? '') === 'follow') {
-                // フォロー時に案内を返す
-                if (!empty($ev['replyToken']) && $token) {
-                    \Illuminate\Support\Facades\Http::withToken($token)
-                        ->post('https://api.line.me/v2/bot/message/reply', [
-                            'replyToken' => $ev['replyToken'],
-                            'messages' => [[
-                                'type' => 'text',
-                                'text' => "通知連携ありがとうございます。\nアプリの『連携コードを発行』で表示された6桁コードを、このトークに送ってください。"
-                            ]],
-                        ]);
-                }
-                continue; // follow はここで終わり
-            }
             $type = $ev['type'] ?? '';
-            if ($type !== 'message') { continue; }
-
-            $msgType = $ev['message']['type'] ?? '';
-            if ($msgType !== 'text') { continue; }
-
-            $text       = (string)($ev['message']['text'] ?? '');
             $replyToken = $ev['replyToken'] ?? null;
             $lineUserId = $ev['source']['userId'] ?? null;
 
-            if (!$lineUserId || $text === '') { continue; }
+            /* ★ postback（参加/辞退） */
+            if ($type === 'postback') {
+                $dataStr = (string)($ev['postback']['data'] ?? '');
+                parse_str($dataStr, $p); // assign_id=..&action=accept|decline
+                $assignId = (int)($p['assign_id'] ?? 0);
+                $action   = ($p['action'] ?? '') === 'accept' ? 'accepted' :
+                            (($p['action'] ?? '') === 'decline' ? 'declined' : null);
 
-            // --- コード抽出（全角→半角、空白除去、先頭の英数4〜10文字を拾う）---
-            $norm = Str::upper(mb_convert_kana($text, 'as')); // 全角→半角 & 大文字
-            $norm = preg_replace('/\s+/u', '', $norm);
-            // 例： ABC123 ／ ABC-123 ／ 123ABC を拾う
-            if (!preg_match('/([A-Z0-9]{4,10})/', $norm, $m)) {
-                \Log::warning('LINE webhook: no code pattern', ['text' => $text, 'norm' => $norm]);
-                continue;
-            }
-            $code = $m[1];
+                if ($assignId && $action && $lineUserId) {
+                    $as = CallRequestCast::with('castProfile.user','callRequest')->find($assignId);
+                    if ($as && $as->castProfile?->user?->line_user_id === $lineUserId) {
+                        // まだ未応答/招待中のみ更新
+                        if (!$as->responded_at && in_array($as->status, ['invited','assigned','pending'], true)) {
+                            $as->status       = $action;
+                            $as->responded_at = now();
+                            $as->save();
 
-            // --- 有効なコードを検索 ---
-            $pair = DB::table('line_link_codes')
-                ->where('code', $code)
-                ->whereNull('used_at')
-                ->where('expires_at', '>', now())
-                ->orderByDesc('id')
-                ->first();
+                            // （任意）リクエスト側の状態更新もここで
+                            // 例：1人でも accepted になったら assigned のまま／全員 declined で closed など
 
-            if (!$pair) {
-                \Log::warning('LINE webhook: code not found/expired', ['code' => $code]);
-                // 必要なら「コードが無効です」と返信
-                if ($replyToken && $token) {
-                    Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
-                        'replyToken' => $replyToken,
-                        'messages' => [['type' => 'text', 'text' => 'コードが無効です。もう一度「連携コードを発行」からお試しください。']],
-                    ]);
+                            // 返信
+                            if ($replyToken && $token) {
+                                $msg = $action === 'accepted'
+                                    ? "参加で承りました。ありがとうございます。"
+                                    : "辞退で承りました。またの機会にお願いします。";
+                                \Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
+                                    'replyToken' => $replyToken,
+                                    'messages' => [[ 'type'=>'text', 'text'=>$msg ]],
+                                ]);
+                            }
+
+                            \Log::info('LINE postback handled', ['assign_id'=>$assignId, 'action'=>$action]);
+                        } else {
+                            \Log::info('LINE postback ignored: already responded or status fixed', ['assign_id'=>$assignId]);
+                        }
+                    } else {
+                        \Log::warning('LINE postback invalid user', ['assign_id'=>$assignId, 'line_user_id'=>$lineUserId]);
+                    }
+                } else {
+                    \Log::warning('LINE postback malformed', ['data'=>$dataStr]);
                 }
-                continue;
+                continue; // ← postback はここで完了
             }
 
-            // --- 表示名（任意で取得） ---
-            $displayName = null;
-            if ($token) {
-                $prof = Http::withToken($token)->get("https://api.line.me/v2/bot/profile/{$lineUserId}");
-                if ($prof->successful()) { $displayName = $prof->json('displayName'); }
-            }
-
-            // --- users を更新 ---
-            DB::table('users')->where('id', $pair->user_id)->update([
-                'line_user_id'      => $lineUserId,
-                'line_display_name' => $displayName,
-                'updated_at'        => now(),
-            ]);
-
-            // --- コードを使用済みに ---
-            DB::table('line_link_codes')->where('id', $pair->id)->update([
-                'used_at'    => now(),
-                'updated_at' => now(),
-            ]);
-
-            \Log::info('LINE webhook LINKED', ['user_id' => $pair->user_id, 'line_user_id' => $lineUserId, 'code' => $code]);
-
-            // --- 成功リプライ（ユーザーに分かるように） ---
-            if ($replyToken && $token) {
-                Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
-                    'replyToken' => $replyToken,
-                    'messages' => [['type' => 'text', 'text' => '連携が完了しました。通知を受け取れるようになりました。']],
-                ]);
-            }
+            // 既存: follow（案内返信）、message（連携コード）など…
         }
 
-        return response()->json(['ok' => true]);
+        return response()->json(['ok'=>true]);
     }
 }
