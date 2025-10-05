@@ -1,16 +1,30 @@
 <script setup>
-import { Head, Link, useForm, router } from '@inertiajs/vue3'
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+
+/** route() が無い/解決失敗でもフォールバック */
+const urlFor = (name, params = {}, fallback = "") => {
+  try {
+    if (typeof route === "function") {
+      const u = route(name, params)
+      if (typeof u === "string" && u.length) return u
+    }
+  } catch {}
+  return fallback
+}
 
 const props = defineProps({
   users: Object, filters: Object, me: Object,
 })
 
+const page  = usePage()
+const flash = computed(() => page.props?.value?.flash ?? {})
+
+/* 一覧・検索 */
 const usersData  = computed(() => props.users?.data  ?? [])
 const usersLinks = computed(() => props.users?.links ?? [])
 const q = ref(props.filters?.q ?? '')
-
 function search() {
   router.get('/admin/users', { q: q.value }, { preserveState: true, replace: true })
 }
@@ -28,18 +42,42 @@ function endDrag(){ if(!dragging) return; dragging=false; document.body.style.cu
 onMounted(()=>{ window.addEventListener('mousemove', onDrag); window.addEventListener('mouseup', endDrag); window.addEventListener('mouseleave', endDrag) })
 onBeforeUnmount(()=>{ window.removeEventListener('mousemove', onDrag); window.removeEventListener('mouseup', endDrag); window.removeEventListener('mouseleave', endDrag) })
 
-/* フォーム */
+/* 編集フォーム */
 const selectedId = ref(null)
 const form = useForm({ id:null, name:'', email:'', phone:'', area:'', is_admin:false })
 const title = computed(()=> form.id ? 'ユーザー編集' : '新規ユーザー')
 
 function resetForm(){ form.reset(); form.clearErrors(); form.id=null; selectedId.value=null }
-function selectForEdit(u){ selectedId.value=u.id; form.id=u.id; form.name=u.name||''; form.email=u.email||''; form.phone=u.phone||''; form.area=u.area||''; form.is_admin=!!u.is_admin }
+function selectForEdit(u){
+  selectedId.value=u.id
+  form.id=u.id; form.name=u.name||''; form.email=u.email||''; form.phone=u.phone||''; form.area=u.area||''; form.is_admin=!!u.is_admin
+}
 function submitCreate(){ form.post('/admin/users', { onSuccess:()=> resetForm() }) }
 function submitUpdate(){ form.put(`/admin/users/${form.id}`) }
 function remove(u){ if(u.id===props.me?.id){ alert('自分自身は削除できません'); return }
   if(!confirm('削除しますか？')) return
   router.delete(`/admin/users/${u.id}`, { onSuccess:()=>{ if(selectedId.value===u.id) resetForm() } })
+}
+
+/* ───────── LINE 送信（個別） ───────── */
+const lineForm = useForm({ text:'', notification_disabled:false })
+const sendingLine = ref(false)
+
+async function sendLine() {
+  if (!form.id || !lineForm.text) return
+  sendingLine.value = true
+  const url = urlFor('admin.users.line.push', { user: form.id }, `/admin/users/${form.id}/line/push`)
+  await lineForm.post(url, {
+    preserveScroll: true,
+    onFinish: () => { sendingLine.value = false },
+    onSuccess: () => { lineForm.reset('text') },
+  })
+}
+
+function openLineAndScroll(u){
+  selectForEdit(u)
+  // 少し待ってからスクロール
+  setTimeout(()=>{ document.getElementById('line-send-box')?.scrollIntoView({ behavior:'smooth', block:'start' }) }, 0)
 }
 </script>
 
@@ -59,10 +97,13 @@ function remove(u){ if(u.id===props.me?.id){ alert('自分自身は削除でき�
           <button @click="resetForm" class="px-3 py-2 rounded bg-gray-100">＋ 新規</button>
         </div>
       </div>
+      <!-- フラッシュ -->
+      <div v-if="flash?.success" class="px-5 py-2 bg-emerald-50 text-emerald-700 border-b">{{ flash.success }}</div>
+      <div v-if="flash?.error" class="px-5 py-2 bg-red-50 text-red-700 border-b whitespace-pre-line">{{ flash.error }}</div>
     </template>
 
     <!-- 上：一覧 -->
-    <div class="p-4 overflow-auto" :style="{ height: `calc(${topPct}% - 56px)` }">
+    <div id="right-pane" class="p-4 overflow-auto" :style="{ height: `calc(${topPct}% - 56px)` }">
       <div class="bg-white rounded-2xl shadow divide-y">
         <div v-if="usersData.length===0" class="px-4 py-6 text-sm text-gray-500">
           ユーザーがいません（または読み込み中）
@@ -81,12 +122,15 @@ function remove(u){ if(u.id===props.me?.id){ alert('自分自身は削除でき�
               <span v-if="u.cast_profile" class="ml-2">
                 / Cast: {{ u.cast_profile.nickname || ('ID:' + u.cast_profile.id) }}
               </span>
+              <span v-if="u.line_user_id" class="ml-2 text-emerald-700">/ LINE連携: 済</span>
+              <span v-else class="ml-2 text-gray-400">/ LINE連携: 未</span>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <Link :href="`/admin/casts?q=${encodeURIComponent(u.email)}`"
-                  class="text-xs px-2 py-1 rounded border">キャストを見る</Link>
+                  class="text-xs px-2 py-1 rounded border">ユーザーを見る</Link>
             <button @click="selectForEdit(u)" class="text-sm px-2 py-1 rounded bg-blue-600 text-white">編集</button>
+            <button @click="openLineAndScroll(u)" class="text-sm px-2 py-1 rounded bg-emerald-600 text-white">LINE送信</button>
             <button @click="remove(u)" class="text-sm px-2 py-1 rounded bg-red-600 text-white">削除</button>
           </div>
         </div>
@@ -141,6 +185,37 @@ function remove(u){ if(u.id===props.me?.id){ alert('自分自身は削除でき�
           </div>
         </form>
       </div>
+
+      <!-- ───────── LINE送信ボックス ───────── -->
+      <div id="line-send-box" class="bg-white rounded-2xl shadow p-4 mt-4">
+        <h3 class="text-lg font-semibold mb-2">LINE メッセージ送信</h3>
+        <div class="text-sm text-gray-600 mb-2">
+          送信先: <span class="font-medium">ユーザー #{{ form.id || '-' }}</span>
+          <span class="ml-2 text-gray-500">(選択してから送信してください)</span>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-sm">メッセージ</label>
+          <textarea v-model="lineForm.text" rows="4" class="w-full border rounded px-3 py-2"
+                    placeholder="送信内容（最大1000文字）"></textarea>
+
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" v-model="lineForm.notification_disabled">
+            通知を鳴らさない
+          </label>
+
+          <div class="mt-1 flex items-center gap-2">
+            <button type="button"
+                    @click="sendLine"
+                    :disabled="sendingLine || !form.id || !lineForm.text"
+                    class="px-4 py-2 rounded text-white"
+                    :class="(sendingLine || !form.id || !lineForm.text) ? 'bg-gray-400' : 'bg-emerald-600 hover:brightness-110'">
+              送信
+            </button>
+            <span class="text-xs text-gray-500">※ 未連携の場合はエラーが返ります</span>
+          </div>
+        </div>
+      </div>
+      <!-- ───────────────────────────────────── -->
     </div>
   </AdminLayout>
 </template>

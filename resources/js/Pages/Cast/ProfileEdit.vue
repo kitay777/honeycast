@@ -3,6 +3,7 @@
 import AppLayout from "@/Layouts/AppLayout.vue"
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3"
 import { ref, computed } from "vue"
+const LIFF_ID = (import.meta.env?.VITE_LIFF_ID ?? '').toString()
 
 /** route() が無い/解決失敗でもフォールバックURLで必ず動かす */
 const urlFor = (name, params = {}, fallback = "") => {
@@ -383,14 +384,13 @@ const copy = async (text) => {
               </ol>
 
               <div class="flex flex-wrap items-center gap-2">
-                <!-- 初期表示から必ず開ける（応答URL→line_env→Vite） -->
-                <a v-if="addUrl"
-                   :href="addUrl"
-                   target="_blank" rel="noopener"
+                <!-- 初期表示から必ず開ける（応答URL→line_env→Vite） 
+                <a v-if="!line.linked && LIFF_ID"
+                   :href="`https://liff.line.me/${LIFF_ID}`"
                    class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">
-                  友だち追加（LINEを開く）
+                  LINEで即連携（ワンタップ）
                 </a>
-
+                -->
                 <!-- 連携コード発行（POSTのみ。開くのは上のリンクが担当） -->
                 <button type="button"
                         @click="startLineLink"

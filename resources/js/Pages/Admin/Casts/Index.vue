@@ -1,12 +1,21 @@
 <script setup>
-import { Head, Link, useForm, router } from '@inertiajs/vue3'
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue' // @ が無ければ相対パスに
+
+/** route() が無い/解決失敗でもフォールバック */
+const urlFor = (name, params = {}, fallback = "") => {
+  try { if (typeof route === "function") { const u = route(name, params); if (typeof u === "string" && u.length) return u } } catch {}
+  return fallback
+}
 
 const props = defineProps({
   casts: Object,   // paginate() 戻り
   filters: Object, // { q }
 })
+
+const page  = usePage()
+const flash = computed(() => page.props?.value?.flash ?? {})
 
 /* データ（未定義ガード） */
 const castsData  = computed(() => props.casts?.data  ?? [])
@@ -82,14 +91,36 @@ function remove(c){
   if(!confirm('削除しますか？')) return
   router.delete(`/admin/casts/${c.id}`, { onSuccess: ()=> { if(selectedId.value===c.id) resetForm() } })
 }
+
+/* ───────── LINE 送信（キャストの紐づくユーザーへ） ───────── */
+const lineForm = useForm({ text:'', notification_disabled:false })
+const sendingLine = ref(false)
+
+/** キャスト行の「LINE送信」→ 下パネルへスクロール＆選択 */
+function openLineAndScroll(c){
+  selectForEdit(c)
+  setTimeout(()=>{ document.getElementById('line-send-box')?.scrollIntoView({ behavior:'smooth', block:'start' }) }, 0)
+}
+
+/** 送信：/admin/users/{user}/line/push へPOST（AdminLineController@push） */
+async function sendLine(castUserId) {
+  if (!castUserId || !lineForm.text) return
+  if (sendingLine.value) return
+  sendingLine.value = true
+  const url = urlFor('admin.users.line.push', { user: castUserId }, `/admin/users/${castUserId}/line/push`)
+  await lineForm.post(url, {
+    preserveScroll: true,
+    onFinish: () => { sendingLine.value = false },
+    onSuccess: () => { lineForm.reset('text') },
+  })
+}
 </script>
 
 <template>
   <Head title="キャスト管理" />
 
-  <!-- 左サイドバーは AdminLayout 内で共通表示（Users/Casts/Shops の3つ） -->
   <AdminLayout active-key="casts">
-    <!-- ヘッダだけスロットで差し込む -->
+    <!-- ヘッダ -->
     <template #header>
       <div class="px-5 py-3 bg-white border-b flex items-center justify-between">
         <div class="text-xl font-semibold">キャスト管理</div>
@@ -101,10 +132,12 @@ function remove(c){
           <button @click="resetForm" class="px-3 py-2 rounded bg-gray-100">＋ 新規</button>
         </div>
       </div>
+      <div v-if="flash?.success" class="px-5 py-2 bg-emerald-50 text-emerald-700 border-b">{{ flash.success }}</div>
+      <div v-if="flash?.error"   class="px-5 py-2 bg-red-50     text-red-700     border-b whitespace-pre-line">{{ flash.error }}</div>
     </template>
 
     <!-- 上：一覧 -->
-    <div class="p-4 overflow-auto" :style="{ height: `calc(${topPct}% - 56px)` }">
+    <div id="right-pane" class="p-4 overflow-auto" :style="{ height: `calc(${topPct}% - 56px)` }">
       <div class="bg-white rounded-2xl shadow divide-y">
         <div v-if="castsData.length === 0" class="px-4 py-6 text-sm text-gray-500">
           キャストがいません（または読み込み中）
@@ -122,13 +155,16 @@ function remove(c){
               </div>
               <div class="text-xs text-gray-500">
                 {{ c.user?.email || '-' }} ・ {{ c.area || '-' }} ・ {{ c.rank || '-' }}
+                <span v-if="c.user?.line_user_id" class="ml-2 text-emerald-700">/ LINE連携: 済</span>
+                <span v-else class="ml-2 text-gray-400">/ LINE連携: 未</span>
               </div>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <Link :href="`/admin/users?q=${encodeURIComponent(c.user?.email || '')}`"
-                  class="text-xs px-2 py-1 rounded border">ユーザーを見る</Link>
+                  class="text-xs px-2 py-1 rounded border">キャストを見る</Link>
             <button @click="selectForEdit(c)" class="text-sm px-2 py-1 rounded bg-blue-600 text-white">編集</button>
+            <button @click="openLineAndScroll(c)" class="text-sm px-2 py-1 rounded bg-emerald-600 text-white">LINE送信</button>
             <button @click="remove(c)" class="text-sm px-2 py-1 rounded bg-red-600 text-white">削除</button>
           </div>
         </div>
@@ -147,7 +183,7 @@ function remove(c){
     <!-- 仕切り -->
     <div class="h-2 bg-gray-200 hover:bg-gray-300 cursor-row-resize" @mousedown="startDrag"></div>
 
-    <!-- 下：編集フォーム -->
+    <!-- 下：編集フォーム + LINE送信 -->
     <div class="p-4 overflow-auto" :style="{ height: `calc(${100 - topPct}% - 2px)` }">
       <div class="bg-white rounded-2xl shadow p-4">
         <h2 class="text-lg font-semibold mb-3">{{ title }}</h2>
@@ -225,6 +261,39 @@ function remove(c){
           </div>
         </form>
       </div>
+
+      <!-- ───────── LINEメッセージ送信 ───────── -->
+      <div id="line-send-box" class="bg-white rounded-2xl shadow p-4 mt-4">
+        <h3 class="text-lg font-semibold mb-2">LINE メッセージ送信</h3>
+        <div class="text-sm text-gray-600 mb-2">
+          送信先ユーザーID: <span class="font-medium">{{ form.id ? '(キャストに紐づくユーザー)' : '-' }}</span>
+          <span class="ml-2 text-gray-500">(上の一覧からキャストを選択してから送信)</span>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-sm">メッセージ</label>
+          <textarea v-model="lineForm.text" rows="4" class="w-full border rounded px-3 py-2"
+                    placeholder="送信内容（最大1000文字）"></textarea>
+
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" v-model="lineForm.notification_disabled">
+            通知を鳴らさない
+          </label>
+
+          <div class="mt-1 flex items-center gap-2">
+            <!-- castsData から選択済みキャストの user.id を引く -->
+            <button
+              type="button"
+              @click="sendLine(castsData.find(v => v.id === selectedId)?.user?.id)"
+              :disabled="sendingLine || !selectedId || !lineForm.text"
+              class="px-4 py-2 rounded text-white"
+              :class="(sendingLine || !selectedId || !lineForm.text) ? 'bg-gray-400' : 'bg-emerald-600 hover:brightness-110'">
+              送信
+            </button>
+            <span class="text-xs text-gray-500">※ 紐づくユーザーが未連携の場合はエラーになります</span>
+          </div>
+        </div>
+      </div>
+      <!-- ─────────────────────────────── -->
     </div>
   </AdminLayout>
 </template>

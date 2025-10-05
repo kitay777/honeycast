@@ -37,6 +37,28 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as VerifyCsrfTokenMidd
 // routes/web.php （要: 認可ミドルウェア）
 use App\Http\Controllers\AdminLineController;
 
+Route::middleware(['auth','verified','can:admin'])
+  ->prefix('admin')->name('admin.')
+  ->group(function () {
+    // フォーム表示（個別）
+    Route::get('/users/{user}/line', [AdminLineController::class, 'form'])
+      ->name('users.line.form');
+
+    // 送信（個別）
+    Route::post('/users/{user}/line/push', [AdminLineController::class, 'push'])
+      ->name('users.line.push');
+
+    // （任意）一括送信：選択した user_id[] 宛に multicast
+    Route::post('/line/multicast', [AdminLineController::class, 'multicast'])
+      ->name('line.multicast');
+  });
+
+Route::get ('/line/liff',        [LineLinkController::class, 'liffPage'])->name('line.liff');
+
+Route::post('/line/link/direct', [LineLinkController::class, 'direct'])
+    ->name('line.link.direct')
+    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class]);
+
 Route::get('/line/link/peek', [\App\Http\Controllers\LineLinkController::class, 'peek'])
     ->name('line.link.peek');
 Route::post('/admin/users/{user}/line/push', [AdminLineController::class, 'push'])

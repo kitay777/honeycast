@@ -18,6 +18,20 @@ class LineWebhookController extends Controller
         $events = $request->input('events', []);
 
         foreach ($events as $ev) {
+            if (($ev['type'] ?? '') === 'follow') {
+                // フォロー時に案内を返す
+                if (!empty($ev['replyToken']) && $token) {
+                    \Illuminate\Support\Facades\Http::withToken($token)
+                        ->post('https://api.line.me/v2/bot/message/reply', [
+                            'replyToken' => $ev['replyToken'],
+                            'messages' => [[
+                                'type' => 'text',
+                                'text' => "通知連携ありがとうございます。\nアプリの『連携コードを発行』で表示された6桁コードを、このトークに送ってください。"
+                            ]],
+                        ]);
+                }
+                continue; // follow はここで終わり
+            }
             $type = $ev['type'] ?? '';
             if ($type !== 'message') { continue; }
 
