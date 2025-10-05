@@ -41,11 +41,11 @@ import { Link } from '@inertiajs/vue3'
       <Link href="/tweets"   class="justify-self-center"><img src="/assets/icons/tweet.png"   class="h-12" /></Link>
 
       <!-- 中央セル -->
-      <div class="relative justify-self-center">
-        <Link href="/call" class="block">
-          <img src="/assets/icons/call.png" class="h-24 -mt-8" />
-        </Link>
-      </div>
+<div class="relative justify-self-center -mt-8">
+  <Link href="/call" class="block w-24 aspect-square">  <!-- ← 幅を基準に正方形化 -->
+    <img src="/assets/icons/call.png" class="w-full h-full object-contain" />
+  </Link>
+</div>
 
       <Link href="/reservations" class="justify-self-center"><img src="/assets/icons/reserve.png" class="h-12" /></Link>
       <Link href="/chat" class="justify-self-center"><img src="/assets/icons/message.png" class="h-12" /></Link>
