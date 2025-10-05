@@ -225,7 +225,7 @@ class CastProfileController extends Controller
                 $profile->update(['photo_path' => $primary->path]);
             }
         });
-
-        return back()->with('success', 'プロフィールを更新しました。');
+        //return back()->with('success', 'プロフィールを更新しました。');
+        return redirect()->route('cast.profile.edit')->with('success', 'プロフィールを更新しました。');
     }
 }

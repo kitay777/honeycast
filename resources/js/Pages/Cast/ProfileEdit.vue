@@ -2,7 +2,7 @@
 <script setup>
 import AppLayout from "@/Layouts/AppLayout.vue"
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3"
-import { ref, computed } from "vue"
+import { ref, computed, watch } from "vue"
 const LIFF_ID = (import.meta.env?.VITE_LIFF_ID ?? '').toString()
 
 /** route() が無い/解決失敗でもフォールバックURLで必ず動かす */
@@ -50,16 +50,25 @@ const form = useForm({
 })
 
 /* ====== 写真管理（複数） ====== */
-const existing = ref(
-  (p.value?.photos ?? []).map(ph => ({
-    id: ph.id,
-    url: ph.url ?? (ph.path ? `/storage/${ph.path}` : null),
-    sort_order: ph.sort_order ?? 0,
-    is_primary: !!ph.is_primary,
-    _delete: false
-  }))
+const existing  = ref([])
+const primaryId = ref(null)
+
+// ★ サーバから props.cast.photos が更新されたら、UI側の配列も作り直す
+watch(
+  () => props.cast?.photos,
+  (photos) => {
+    const arr = (photos ?? []).map(ph => ({
+      id: ph.id,
+      url: ph.url ?? (ph.path ? `/storage/${ph.path}` : null),
+      sort_order: ph.sort_order ?? 0,
+      is_primary: !!ph.is_primary,
+      _delete: false,
+    }))
+    existing.value  = arr
+    primaryId.value = arr.find(x => x.is_primary)?.id || null
+  },
+  { immediate: true }
 )
-const primaryId = ref(existing.value.find(x => x.is_primary)?.id || null)
 const newFiles = ref([])
 
 /* 安全なプレビューURL生成/解放 */

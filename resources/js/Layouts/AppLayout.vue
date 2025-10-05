@@ -24,6 +24,7 @@ import { Link } from '@inertiajs/vue3'
       <Link href="/contact" class="flex flex-col items-center">
         <img src="/assets/icons/contact.png" class="h-12 mb-1" />
       </Link>
+      <Link href="/dashboard"  class="justify-self-center">HOME</Link>
     </header>
 
     <!-- コンテンツ部分 -->
@@ -34,9 +35,8 @@ import { Link } from '@inertiajs/vue3'
     <!-- フッター固定 -->
     <footer
       class="fixed bottom-0 left-0 right-0 z-50 bg-[#4b3621] text-yellow-200
-             grid grid-cols-6 items-center h-20 shadow"
+             grid grid-cols-5 items-center h-20 shadow"
     >
-      <Link href="/dashboard"  class="justify-self-center">HOME</Link>
       <Link href="/search"  class="justify-self-center"><img src="/assets/icons/search.png"  class="h-12" /></Link>
       <Link href="/tweets"   class="justify-self-center"><img src="/assets/icons/tweet.png"   class="h-12" /></Link>
 
