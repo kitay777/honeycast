@@ -52,12 +52,20 @@ import { Link } from '@inertiajs/vue3'
         クレジットカード決済でも領収書発行可能となります。
       </div>
 
-      <!-- ボタン -->
-      <div class="flex justify-center">
+<!-- ボタン -->
+      <div class="flex flex-col items-center gap-3">
+        <!-- 予約する -->
         <Link :href="route('call.create')"
               class="px-14 py-4 rounded-full text-xl bg-gradient-to-r from-[#caa14b] to-[#f0e1b1]
-                    text-black font-bold tracking-[0.5em] shadow text-center">
+                     text-black font-bold tracking-[0.5em] shadow text-center">
           予約する
+        </Link>
+
+        <!-- ゲームを見る -->
+        <Link :href="(typeof route==='function') ? route('games.index') : '/games'"
+              class="px-14 py-4 rounded-full text-xl bg-gradient-to-r from-[#6b7280] to-[#a1a1aa]
+                     text-white font-bold tracking-[0.5em] shadow text-center">
+          ゲームを見る
         </Link>
       </div>
     </div>

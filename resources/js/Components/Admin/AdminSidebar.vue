@@ -14,6 +14,12 @@ const props = defineProps({
       { key: 'shops', label: 'ショップ管理', to: '/admin/shops' },
       { key: 'tags', label: 'タグ管理', to: '/admin/tags' },
       { key: 'ng', label: '禁止ワード', to: '/admin/ng-words' },
+      { key: 'games', label: '動画（ゲーム）管理', to: '/admin/games' },
+      { key: 'banners', label: 'バナー管理', to: '/admin/banners' },
+      { key: 'faqs', label: 'FAQ管理', to: '/admin/faqs' },
+      { key: 'inquiries', label: 'お問い合わせ', to: '/admin/inquiries' },
+      { key: 'settings', label: '各種設定', to: '/admin/settings' },
+      { key: 'ng', label: '禁止ワード', to: '/admin/ng-words' },
     ]),
   },
 })

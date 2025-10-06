@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\User;
+
 
 class AuthenticatedSessionController extends Controller
 {
@@ -37,7 +39,7 @@ public function store(LoginRequest $request)
         return redirect()->route('line.register.complete', ['t' => $token]);
     }
 
-    return redirect()->intended(\App\Providers\RouteServiceProvider::HOME);
+    return redirect()->intended(config('app.home', route('cast.profile.edit')));
 }
 
     /**

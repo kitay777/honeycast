@@ -35,6 +35,22 @@ use App\Http\Controllers\LineLinkController;
 use App\Http\Controllers\LineWebhookController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as VerifyCsrfTokenMiddleware;
 
+use App\Http\Controllers\Admin\GameController as AdminGameController;
+use App\Http\Controllers\GameController;
+
+// 公開
+Route::get('/games',            [GameController::class,'index'])->name('games.index');
+Route::get('/games/{game:slug}',[GameController::class,'show'])->name('games.show');
+
+// 管理（admin権限）
+Route::middleware(['auth','verified','can:admin'])
+  ->prefix('admin')->name('admin.')->group(function(){
+    Route::get   ('/games',         [AdminGameController::class,'index'])->name('games.index');
+    Route::post  ('/games',         [AdminGameController::class,'store'])->name('games.store');
+    Route::put   ('/games/{game}',  [AdminGameController::class,'update'])->name('games.update');
+    Route::patch ('/games/{game}/publish', [AdminGameController::class,'togglePublish'])->name('games.publish');
+    Route::delete('/games/{game}',  [AdminGameController::class,'destroy'])->name('games.destroy');
+});
 Route::get('/register/line/complete', [LineRegistrationController::class, 'completeWithToken'])
     ->name('line.register.complete'); // ゲストOK（GETなのでCSRF不要）
 
