@@ -18,6 +18,8 @@ use App\Http\Controllers\Admin\CastController as AdminCastController;
 use App\Http\Controllers\Admin\ShopController;
 use App\Http\Controllers\Admin\ShopInviteController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\AdminLineController;
+use App\Http\Controllers\LineRegistrationController;
 
 
 // routes/web.php
@@ -33,55 +35,65 @@ use App\Http\Controllers\LineLinkController;
 use App\Http\Controllers\LineWebhookController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as VerifyCsrfTokenMiddleware;
 
-// routes/web.php
-// routes/web.php （要: 認可ミドルウェア）
-use App\Http\Controllers\AdminLineController;
-
-Route::middleware(['auth','verified','can:admin'])
-  ->prefix('admin')->name('admin.')
-  ->group(function () {
-    // フォーム表示（個別）
-    Route::get('/users/{user}/line', [AdminLineController::class, 'form'])
-      ->name('users.line.form');
-
-    // 送信（個別）
-    Route::post('/users/{user}/line/push', [AdminLineController::class, 'push'])
-      ->name('users.line.push');
-
-    // （任意）一括送信：選択した user_id[] 宛に multicast
-    Route::post('/line/multicast', [AdminLineController::class, 'multicast'])
-      ->name('line.multicast');
-  });
-
-Route::get ('/line/liff',        [LineLinkController::class, 'liffPage'])->name('line.liff');
-
-Route::post('/line/link/direct', [LineLinkController::class, 'direct'])
-    ->name('line.link.direct')
-    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class]);
-
-Route::get('/line/link/peek', [\App\Http\Controllers\LineLinkController::class, 'peek'])
-    ->name('line.link.peek');
-Route::post('/admin/users/{user}/line/push', [AdminLineController::class, 'push'])
-    ->name('admin.users.line.push');
+Route::get('/register/line/complete', [LineRegistrationController::class, 'completeWithToken'])
+    ->name('line.register.complete'); // ゲストOK（GETなのでCSRF不要）
 
 
+/* ▼ ゲスト：登録（LIFF） */
+Route::middleware('guest')->group(function () {
+    Route::get('/register/line', [LineRegistrationController::class, 'page'])->name('line.register');
 
-Route::middleware(['auth','verified'])->group(function () {
-    Route::post('/line/link/start', [LineLinkController::class, 'start'])->name('line.link.start');
-    Route::get ('/line/link/status',      [LineLinkController::class,'status'])->name('line.link.status');
-    Route::post('/line/push/test',        [LineLinkController::class,'pushTest'])->name('line.push.test');
-    Route::delete('/line/link/disconnect',[LineLinkController::class,'disconnect'])->name('line.link.disconnect');
+    // ゲスト登録は CSRF を外してもOK（使うなら withoutMiddleware を外して Vue 側で X-CSRF-TOKEN 送付）
+    Route::post('/register/line/direct', [LineRegistrationController::class, 'direct'])
+        ->name('line.register.direct')
+        ->withoutMiddleware([VerifyCsrfTokenMiddleware::class]);
 });
 
+/* ▼ Admin */
+Route::middleware(['auth','verified','can:admin'])
+    ->prefix('admin')->name('admin.')->group(function () {
+
+    Route::get('/users/{user}/line', [AdminLineController::class, 'form'])->name('users.line.form');
+    Route::post('/users/{user}/line/push', [AdminLineController::class, 'push'])->name('users.line.push');
+    Route::post('/line/multicast', [AdminLineController::class, 'multicast'])->name('line.multicast');
+
+    // （重複していた invitations.respond は1つでOK）
+    Route::get('/invitations/respond/{assignment}/{decision}',
+        [\App\Http\Controllers\Cast\InvitationController::class, 'respondSigned'])
+        ->name('invitations.respond')->middleware('signed');
+});
+
+/* ▼ LINE 連携（ログイン済み） */
+Route::middleware(['auth'])->group(function () {
+    // ProfileEdit のワンタップ連携は必ず auth を通す
+    Route::post('/line/link/direct', [LineLinkController::class, 'direct'])->name('line.link.direct');
+
+    Route::post('/line/link/start', [LineLinkController::class, 'start'])->name('line.link.start');
+    Route::get ('/line/link/status', [LineLinkController::class,'status'])->name('line.link.status');
+    Route::post('/line/push/test',   [LineLinkController::class,'pushTest'])->name('line.push.test');
+    Route::delete('/line/link/disconnect', [LineLinkController::class,'disconnect'])->name('line.link.disconnect');
+
+    // Chat：こちらだけ残す（ルート名は casts.startChat に統一）
+    Route::post('/casts/{cast}/start-chat', [ChatController::class,'start'])->name('casts.startChat');
+});
+
+// ← こちらは削除：/casts/{cast}/chat/start の重複ルート
+// Route::post('/casts/{cast}/chat/start', [ChatController::class, 'start'])->middleware(['auth','verified'])->name('casts.startChat');
+
+/* ▼ 参照系（CSRF不要） */
+Route::get('/line/link/peek', [LineLinkController::class, 'peek'])->name('line.link.peek');
 Route::post('/line/webhook', [LineWebhookController::class, 'handle'])
-    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class])
-    ->name('line.webhook');
+    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class])->name('line.webhook');
+
+/* ▼ 既存の他ルートはそのまま（省略） */
+
 
 Route::get('/terms', [TermsController::class, 'show'])->name('terms');
 Route::get('/unei', [TermsController::class, 'unei'])->name('unei');
-Route::post('/casts/{cast}/chat/start', [\App\Http\Controllers\ChatController::class, 'start'])
+/*Route::post('/casts/{cast}/chat/start', [\App\Http\Controllers\ChatController::class, 'start'])
     ->middleware(['auth','verified'])
     ->name('casts.startChat');
+*/
 // ログイン中の再確認＆同意
 Route::middleware(['auth','verified'])->group(function () {
     Route::get('/terms/review',  [TermsController::class, 'review'])->name('terms.review');
@@ -106,9 +118,6 @@ Route::middleware(['auth'])->post('/cast/upgrade', [CastRegisterController::clas
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
-    
-    Route::post('/casts/{cast}/start-chat', [ChatController::class,'start'])
-        ->name('casts.startChat');
 
     Route::get('/chat/{thread}', [ChatController::class,'show'])
         ->name('chat.show');

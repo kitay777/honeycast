@@ -24,7 +24,9 @@ import { Link } from '@inertiajs/vue3'
       <Link href="/contact" class="flex flex-col items-center">
         <img src="/assets/icons/contact.png" class="h-12 mb-1" />
       </Link>
-      <Link href="/dashboard"  class="justify-self-center">HOME</Link>
+      <Link href="/dashboard" class="flex flex-col items-center">
+        <img src="/assets/icons/home.png" class="h-12 mb-1" />
+      </Link>
     </header>
 
     <!-- コンテンツ部分 -->

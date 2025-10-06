@@ -3,9 +3,52 @@
 import AppLayout from "@/Layouts/AppLayout.vue"
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3"
 import { ref, computed, watch } from "vue"
+import { onMounted } from "vue" // なくてもOK
 
-/** LIFF を使う場合は .env に VITE_LIFF_ID を入れてください */
-const LIFF_ID = (import.meta.env?.VITE_LIFF_ID ?? '').toString()
+// 連携確認の自動ポーリング
+const polling = ref(false)
+let pollTimer = null
+
+const pollStatusOnce = async () => {
+  try {
+    const res = await fetch(urlFor('line.link.status', {}, '/line/link/status') + '?json=1', {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' },
+    })
+    if (!res.ok) return
+    const j = await res.json()
+    if (j?.linked) {
+      // 連携済みUIに切り替え
+      line.value.linked = true
+      line.value.userId = j.user_id ?? null
+      line.value.displayName = j.display_name ?? null
+      // auth も最新化（ヘッダーの表示などに反映）
+      router.reload({ only: ['auth'] })
+      stopPolling()
+    }
+  } catch (_) {}
+}
+
+const startPolling = (intervalMs = 4000, timeoutMs = 2 * 60 * 1000) => {
+  if (polling.value) return
+  polling.value = true
+  pollStatusOnce()
+  pollTimer = window.setInterval(pollStatusOnce, intervalMs)
+  // タイムアウトで自動停止
+  window.setTimeout(() => stopPolling(), timeoutMs)
+}
+
+const stopPolling = () => {
+  polling.value = false
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+}
+
+const page = usePage() // ← 先に宣言
+const LIFF_ID = (
+  page.props?.value?.liff?.id ??
+  import.meta.env?.VITE_LIFF_ID ??
+  ''
+).toString()
 
 /** route() が無い/解決失敗でもフォールバックURLで必ず動かす */
 const urlFor = (name, params = {}, fallback = "") => {
@@ -177,7 +220,6 @@ const toggleTagId = (id) => {
 }
 
 /* ====== ページ/ユーザー ====== */
-const page = usePage()
 const authedUser = computed(() => page.props?.value?.auth?.user ?? null)
 
 /* ====== LINE 連携（リンクは常時表示） ====== */
@@ -224,6 +266,7 @@ const startLineLink = async () => {
       },
       onFinish: async () => {
         await refreshLineCode() // flash が無くても最新状態にする
+        startPolling()
       },
     })
   } finally {
@@ -294,6 +337,57 @@ const disconnectLine = async () => {
 const copy = async (text) => {
   try { await navigator.clipboard.writeText(text) } catch {}
 }
+
+const loadScript = (src) => new Promise((resolve, reject) => {
+  const s = document.createElement('script'); s.src = src; s.async = true;
+  s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+});
+
+/** ワンタップ連携（LIFF） */
+const linkViaLiff = async () => {
+  try {
+    if (!LIFF_ID) { alert('LIFF ID が未設定です'); return; }
+    await loadScript('https://static.line-scdn.net/liff/edge/2/sdk.js');
+    await window.liff.init({ liffId: LIFF_ID });
+    if (!window.liff.isInClient() && !window.liff.isLoggedIn()) {
+      // LINE外 → LINEで開く
+      location.href = `https://liff.line.me/${LIFF_ID}`; return;
+    }
+    if (!window.liff.isLoggedIn()) window.liff.login();
+
+    // 友だち状態（未追加なら案内）
+    let friendFlag = false;
+    try { const fr = await window.liff.getFriendship(); friendFlag = !!fr.friendFlag; } catch {}
+    if (!friendFlag) {
+      const go = confirm('まずは公式アカウントを友だち追加してください。LINEを開きます。');
+      if (go && addUrl.value) window.open(addUrl.value, '_blank', 'noopener');
+      return;
+    }
+
+    const prof = await window.liff.getProfile();
+    // サーバへリンク
+    const res = await fetch(urlFor('line.link.direct', {}, '/line/link/direct'), {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN': (usePage().props?.value?.csrf ?? '') },
+      credentials: 'include',
+      body: JSON.stringify({ uid: prof.userId, displayName: prof.displayName }),
+    });
+    const json = await res.json().catch(()=>({}));
+    if (!res.ok || !json.ok) {
+      alert('連携に失敗しました。友だち追加の状態や設定を確認してください。');
+      return;
+    }
+    line.value.linked       = true;
+    line.value.userId       = json.uid;
+    line.value.displayName  = json.displayName;
+    alert('LINE連携が完了しました');
+    // ヘッダーや他UIで auth.user.line_user_id を即反映
+    router.reload({ only: ['auth'] })
+  } catch (e) {
+    console.error(e);
+    alert('エラー: ' + (e?.message || e));
+  }
+};
 </script>
 
 <template>
@@ -385,9 +479,16 @@ const copy = async (text) => {
                 <a v-if="addUrl" :href="addUrl" target="_blank" rel="noopener"
                    class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">友だち追加（LINEを開く）</a>
 
+   <!--
+   <button type="button"
+           v-if="LIFF_ID"
+           @click="linkViaLiff"
+           class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">
+     LINEで即連携（ワンタップ）
+   </button>
                 <a v-if="LIFF_ID" :href="`https://liff.line.me/${LIFF_ID}`"
                    class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">LINEで即連携</a>
-
+-->
                 <button type="button" @click="startLineLink" :disabled="lineLinking"
                         class="px-3 py-1 rounded bg-yellow-200 text-black text-sm">連携コードを発行</button>
 

@@ -7,49 +7,45 @@ use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that is loaded on the first page visit.
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determine the current asset version.
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
     {
         return [
             ...parent::share($request),
+
+            // 認証情報（必要に応じて select で絞るのも可）
             'auth' => [
                 'user' => $request->user(),
             ],
-                    // 友だち追加導線（常に props で渡す）
-            'line' => [
-                'friend_url' => config('services.line.friend_url'),
-                'friend_qr'  => config('services.line.friend_qr'),
+
+            // ★ Vue から fetch/post で使えるように常に渡す
+            'csrf' => csrf_token(),
+
+            // フラッシュ（既存 + line 用）
+            'flash' => [
+                'success'     => fn () => $request->session()->get('success'),
+                'error'       => fn () => $request->session()->get('error'),
+                'line'        => fn () => $request->session()->get('line'),          // 連携コードなど
+                'line_status' => fn () => $request->session()->get('line_status'),   // 連携確認の返却
             ],
 
-            // セッションフラッシュに 'line' を載せて Vue 側で拾えるように
-            'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
-                'line'    => fn () => $request->session()->get('line'),        // ★ 追加
-                'line_status' => fn () => $request->session()->get('line_status'), // 使うなら
-            ],
+            // ★ LINE の共有はここに統一。ProfileEdit / 登録ページ / 友だち追加で全て参照可能
             'line_env' => [
-                'bot_url' => config('services.line.bot_add_url'), // 例: https://line.me/R/ti/p/@YOUR_BOT_ID
-                'bot_qr'  => config('services.line.bot_qr'),      // 任意
+                // 友だち追加（URL/QR）。config/services.php で定義：
+                // 'bot_add_url' と 'bot_qr' を用意（別名 friend_url などは混乱の元）
+                'bot_url' => config('services.line.bot_add_url'),   // ex: https://page.line.me/xxxxx
+                'bot_qr'  => config('services.line.bot_qr'),        // 省略可
+            ],
+
+            // （任意）LIFF ID を全ページで使いたい場合
+            'liff' => [
+                'id' => config('services.line.liff_id'),
             ],
         ];
     }

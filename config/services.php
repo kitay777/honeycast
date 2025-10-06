@@ -42,6 +42,7 @@ return [
         'friend_qr'  => env('LINE_BOT_QR_URL'),
         'bot_add_url' => env('LINE_BOT_ADD_URL') ?: env('VITE_LINE_BOT_ADD_URL'),
         'bot_qr'      => env('LINE_BOT_QR') ?: env('VITE_LINE_BOT_QR'),
+        'liff_id'     => env('VITE_LIFF_ID'),
     ],
 
 ];
