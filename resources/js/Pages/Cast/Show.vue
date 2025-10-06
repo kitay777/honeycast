@@ -112,6 +112,10 @@ const startChat = () => {
     { onFinish: () => { startingChat.value = false } }
   )
 }
+const startChatHref = computed(() =>
+  urlFor('casts.startChat', props.cast.id, `/casts/${props.cast.id}/start-chat`)
+)
+
 </script>
 
 <template>
@@ -195,6 +199,8 @@ const startChat = () => {
               申請済み<span v-if="unblurStatus">（{{ unblurStatus }}）</span>
             </span>
             -->
+
+<!--
 <Link
   as="button"
   method="post"
@@ -203,7 +209,6 @@ const startChat = () => {
 >
   メッセージを送る
 </Link>
-<!--
             <button class="px-4 py-2 rounded bg-[#a99a86] text-black shadow">指名する</button>
 -->
           </div>
@@ -255,6 +260,22 @@ const startChat = () => {
         </div>
       </section>
     </div>
+    <!-- 固定CTA: フッターの上に常に表示 -->
+<div class="fixed z-[60] pointer-events-none right-4"
+     :style="{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }">
+  <Link
+    as="button"
+    method="post"
+    :href="startChatHref"
+    class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium
+           shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105
+           active:translate-y-[1px] transition flex items-center gap-2"
+  >
+    <img src="/assets/icons/message.png" alt="" class="h-5 w-5" />
+    メッセージ
+  </Link>
+</div>
+
   </AppLayout>
 </template>
 
