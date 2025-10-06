@@ -1,7 +1,7 @@
 <!-- resources/js/Pages/Cast/Show.vue -->
 <script setup>
 import { computed, ref, watch } from "vue"
-import { router } from "@inertiajs/vue3"
+import { router, Link } from "@inertiajs/vue3"
 import AppLayout from "@/Layouts/AppLayout.vue"
 
 /** route() が無くても動くフォールバック */
@@ -195,11 +195,17 @@ const startChat = () => {
               申請済み<span v-if="unblurStatus">（{{ unblurStatus }}）</span>
             </span>
             -->
-            <button @click="startChat" :disabled="startingChat"
-              class="px-4 py-2 rounded bg-[#e7d7a0] text-black shadow disabled:opacity-60">
-              {{ startingChat ? "開始中..." : "メッセージを送る" }}
-            </button>
+<Link
+  as="button"
+  method="post"
+  :href="urlFor('casts.startChat', props.cast.id, `/casts/${props.cast.id}/start-chat`)"
+  class="px-4 py-2 rounded bg-[#e7d7a0] text-black shadow"
+>
+  メッセージを送る
+</Link>
+<!--
             <button class="px-4 py-2 rounded bg-[#a99a86] text-black shadow">指名する</button>
+-->
           </div>
         </div>
       </section>
