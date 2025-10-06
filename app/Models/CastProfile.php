@@ -12,12 +12,18 @@ class CastProfile extends Model
     protected $fillable = [
         'user_id','nickname','rank','age','height_cm','cup','style','alcohol','mbti',
         'area','tags','freeword','photo_path',
-        'is_blur_default',
+        'is_blur_default', 
+        'cast_profile_id',
+        'path', 
+        'sort_order', 
+        'is_primary',
+        'should_blur',
     ];
 
     protected $casts = [
         'tags' => 'array',
         'is_blur_default' => 'boolean',
+        'should_blur' => 'boolean',
     ];
 
     public function user()

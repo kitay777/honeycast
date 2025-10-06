@@ -4,72 +4,105 @@ namespace App\Http\Controllers;
 
 use App\Models\CastProfile;
 use App\Models\CastShift;
+use App\Models\CastPhotoViewPermission;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage; // ★ 追加
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Schema; // 追加
+use App\Models\CastPhoto; // 追加
 
 class CastController extends Controller
 {
+    /**
+     * キャスト詳細（プロフィール＋写真＋直近1週間のスケジュール）
+     * ぼかしの仕様：
+     *  - 初期状態は非ぼかし
+     *  - DBの cast_photos.should_blur が true で、閲覧許可が無いときだけぼかす
+     *  - primary は常に非ぼかし
+     */
+
 
 public function show(CastProfile $cast)
 {
-    /* ▼▼ ここを必ず最初に置く：直近1週間のスケジュール生成 ▼▼ */
+    /* 直近1週間スケジュール */
     $today = Carbon::today();
-    $days = collect(range(0, 6))->map(function ($i) use ($cast, $today) {
+    $days  = collect(range(0, 6))->map(function ($i) use ($cast, $today) {
         $d = $today->copy()->addDays($i)->toDateString();
         $slots = $cast->shifts()->whereDate('date', $d)
             ->orderBy('start_time')
-            ->get(['start_time', 'end_time'])
-            ->map(fn($s) => [
-                'start' => substr($s->start_time, 0, 5),
-                'end'   => substr($s->end_time, 0, 5),
-            ]);
-
-        return [
-            'date'    => $d,
-            'weekday' => $today->copy()->addDays($i)->locale('ja')->isoFormat('ddd'),
-            'slots'   => $slots,
-        ];
+            ->get(['start_time','end_time'])
+            ->map(fn($s)=>['start'=>substr($s->start_time,0,5), 'end'=>substr($s->end_time,0,5)]);
+        return ['date'=>$d, 'weekday'=>$today->copy()->addDays($i)->locale('ja')->isoFormat('ddd'), 'slots'=>$slots];
     });
-    /* ▲▲ ここまで ― $days を必ず定義 ▲▲ */
 
     $viewer = Auth::user();
 
-    // プロフ許可は使わず、本人/管理者のみ無条件アンブラー
-    $isOwnerOrAdmin = $viewer && (
-        $cast->user_id === $viewer->id ||
-        (method_exists($viewer, 'isAdmin') && $viewer->isAdmin())
-    );
-    $isBlurDefault = is_null($cast->is_blur_default) ? true : (bool)$cast->is_blur_default;
+    // 本人/管理者は無条件で閲覧許可
+    $viewerHasAccess = false;
+    if ($viewer) {
+        $viewerHasAccess = $cast->user_id === $viewer->id
+            || (method_exists($viewer,'isAdmin') && $viewer->isAdmin());
+    }
 
-    // 写真ごとのぼかし判定（個別申請のみで解除）
-    $photos = $cast->photos()->orderBy('sort_order')->get()->map(function ($p) use ($viewer, $isOwnerOrAdmin, $isBlurDefault) {
-        $photoDefault   = is_null($p->is_blur_default) ? true : (bool)$p->is_blur_default;
-        $photoHasAccess = $isOwnerOrAdmin || $p->viewerHasUnblurAccess($viewer); // ※プロフ許可は足さない
-        $photoPerm      = $p->permissionFor($viewer);
-       // ★ マスター（primary）は常に非ブラー
-       if ($p->is_primary) {
-           $should = false;
-       } else {
-           $should = ($isBlurDefault || $photoDefault) && !$photoHasAccess;
-       }
+    /* 個別許可の取得（viewer_id / user_id のどちらでも動く） */
+    $photosRaw = $cast->photos()->orderBy('sort_order')
+        ->get(['id','path','sort_order','is_primary','should_blur']);
+
+    $approvedMap = [];
+    $pendingMap  = [];
+    if ($viewer && $photosRaw->isNotEmpty()) {
+        $photoIds = $photosRaw->pluck('id')->all();
+        $viewerCol = Schema::hasColumn('cast_photo_view_permissions','viewer_id') ? 'viewer_id'
+                   : (Schema::hasColumn('cast_photo_view_permissions','user_id') ? 'user_id' : null);
+
+        $permsQ = CastPhotoViewPermission::whereIn('cast_photo_id', $photoIds);
+        if ($viewerCol) $permsQ->where($viewerCol, $viewer->id);
+
+        $perms = $permsQ->orderByDesc('id')->get(['cast_photo_id','status']);
+
+        foreach ($perms as $perm) {
+            $pid = $perm->cast_photo_id;
+            if ($perm->status === 'approved' && !isset($approvedMap[$pid])) {
+                $approvedMap[$pid] = true;
+            } elseif ($perm->status === 'pending' && !isset($pendingMap[$pid])) {
+                $pendingMap[$pid]  = true;
+            }
+        }
+    }
+
+    /* 写真の最終形（boolean で揃える） */
+    $photos = $photosRaw->map(function ($p) use ($viewerHasAccess, $approvedMap, $pendingMap) {
+        $isPrimary = (bool)$p->is_primary;
+        $flagBlur  = (bool)$p->should_blur;        // ← DB の should_blur を採用
+        $granted   = $viewerHasAccess || isset($approvedMap[$p->id]);
+        $requested = isset($pendingMap[$p->id]);
+
+        // ルール: primary は常に非ぼかし／それ以外は (should_blur && !granted)
+        $should = $isPrimary ? false : ($flagBlur && !$granted);
 
         return [
-            'id'           => $p->id,
-            'url'          => Storage::disk('public')->url($p->path),
-            'is_primary'   => (bool)$p->is_primary,
-            'should_blur'  => $should,
-            'unblur'       => [
-                'requested' => (bool) ($photoPerm && $photoPerm->status === 'pending'),
-                'status'    => $photoPerm->status ?? null,
+            'id'          => $p->id,
+            'url'         => Storage::disk('public')->url($p->path),
+            'sort_order'  => (int)$p->sort_order,
+            'is_primary'  => $isPrimary,
+            'should_blur' => $should,
+            'unblur'      => [
+                'granted'   => (bool)$granted,
+                'requested' => (bool)$requested,
+                'status'    => $granted ? 'approved' : ($requested ? 'pending' : null),
             ],
         ];
     });
 
-    // タグ配列化
+    // 後方互換: photo_path（旧UI）
+    $primary = $cast->photos()->where('is_primary', true)->first()
+             ?? $cast->photos()->orderBy('sort_order')->first();
+    $photoPath = $primary?->path;
+
+    // タグ配列化（文字列/配列両対応）
     $tags = $cast->tags;
     if (!is_array($tags)) {
         $tags = collect(preg_split('/[,\s、，]+/u', (string)$tags, -1, PREG_SPLIT_NO_EMPTY))
@@ -79,8 +112,8 @@ public function show(CastProfile $cast)
     return Inertia::render('Cast/Show', [
         'cast' => [
             'id'         => $cast->id,
+            'user_id'    => $cast->user_id,
             'nickname'   => $cast->nickname,
-            'photo_path' => $cast->photo_path,
             'rank'       => $cast->rank,
             'age'        => $cast->age,
             'height_cm'  => $cast->height_cm,
@@ -91,23 +124,16 @@ public function show(CastProfile $cast)
             'area'       => $cast->area,
             'tags'       => $tags,
             'freeword'   => $cast->freeword,
-            'user_id'    => $cast->user_id,
 
-            // フォールバック用
-            'is_blur_default'       => $isBlurDefault,
-            'viewer_is_owner_admin' => $isOwnerOrAdmin,
-            'should_blur' => false,
-
-            // サブ写真（個別申請のみで解除）
-            'photos' => $photos,
+            'photo_path' => $photoPath,                 // 後方互換
+            'photos'     => $photos,                    // ← Show.vue のロジックはこの配列を参照
+            'viewer_has_unblur_access' => (bool)$viewerHasAccess,
         ],
         'schedule' => $days,
     ]);
 }
 
-
-
-    /** 編集画面 */
+    /** 編集画面（スケジュール） */
     public function editSchedule(CastProfile $cast)
     {
         $this->authorizeEditing($cast);
@@ -131,17 +157,17 @@ public function show(CastProfile $cast)
         ]);
     }
 
-    /** 保存（1週間ぶんをまとめて上書き） */
+    /** 1週間をまとめて保存 */
     public function updateSchedule(Request $request, CastProfile $cast)
     {
         $this->authorizeEditing($cast);
 
         $data = $request->validate([
-            'days'                     => ['required', 'array', 'size:7'],
-            'days.*.date'              => ['required', 'date'],
-            'days.*.slots'             => ['array'],
-            'days.*.slots.*.start'     => ['required_with:days.*.slots', 'regex:/^\d{2}:\d{2}$/'],
-            'days.*.slots.*.end'       => ['required_with:days.*.slots', 'regex:/^\d{2}:\d{2}$/'],
+            'days'                 => ['required', 'array', 'size:7'],
+            'days.*.date'          => ['required', 'date'],
+            'days.*.slots'         => ['array'],
+            'days.*.slots.*.start' => ['required_with:days.*.slots', 'regex:/^\d{2}:\d{2}$/'],
+            'days.*.slots.*.end'   => ['required_with:days.*.slots', 'regex:/^\d{2}:\d{2}$/'],
         ]);
 
         DB::transaction(function () use ($cast, $data) {

@@ -3,6 +3,8 @@
 import AppLayout from "@/Layouts/AppLayout.vue"
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3"
 import { ref, computed, watch } from "vue"
+
+/** LIFF を使う場合は .env に VITE_LIFF_ID を入れてください */
 const LIFF_ID = (import.meta.env?.VITE_LIFF_ID ?? '').toString()
 
 /** route() が無い/解決失敗でもフォールバックURLで必ず動かす */
@@ -27,11 +29,6 @@ const props = defineProps({
 /* ====== 安全な初期化 ====== */
 const p = computed(() => props.cast ?? {})
 
-/* tags 初期化（サーバが文字列でも安全） */
-const initialTags = Array.isArray(p.value?.tags)
-  ? p.value.tags
-  : (p.value?.tags ? String(p.value.tags).split(/[\s,，、]+/).filter(Boolean) : [])
-
 /* ====== プロフィール基本フォーム ====== */
 const form = useForm({
   id: p.value?.id ?? null,
@@ -53,7 +50,7 @@ const form = useForm({
 const existing  = ref([])
 const primaryId = ref(null)
 
-// ★ サーバから props.cast.photos が更新されたら、UI側の配列も作り直す
+/* サーバから cast.photos が更新されたら、UI側の配列も作り直す */
 watch(
   () => props.cast?.photos,
   (photos) => {
@@ -62,6 +59,7 @@ watch(
       url: ph.url ?? (ph.path ? `/storage/${ph.path}` : null),
       sort_order: ph.sort_order ?? 0,
       is_primary: !!ph.is_primary,
+      _blur: ph.should_blur === true,  // ← サーバの should_blur を反映
       _delete: false,
     }))
     existing.value  = arr
@@ -69,12 +67,13 @@ watch(
   },
   { immediate: true }
 )
+
 const newFiles = ref([])
 
-/* 安全なプレビューURL生成/解放 */
+/* プレビューURL生成/解放 */
 const getPreviewUrl = (file) => {
   try {
-    if (typeof file === 'object' && file && (file instanceof Blob || file instanceof File)) {
+    if (file && (file instanceof Blob || file instanceof File)) {
       const URL_ = (globalThis?.URL || window?.URL || self?.URL)
       return URL_?.createObjectURL ? URL_.createObjectURL(file) : ''
     }
@@ -82,13 +81,10 @@ const getPreviewUrl = (file) => {
   return ''
 }
 const revokePreviewUrl = (src) => {
-  try {
-    const URL_ = (globalThis?.URL || window?.URL || self?.URL)
-    URL_?.revokeObjectURL?.(src)
-  } catch (_) {}
+  try { (globalThis?.URL || window?.URL || self?.URL)?.revokeObjectURL?.(src) } catch (_) {}
 }
 
-/* 追加/並び替え/メイン/削除 */
+/* 追加/並び替え/メイン/削除/ぼかし */
 const onAddPhotos = (e) => {
   const files = Array.from(e.target.files || [])
   if (!files.length) return
@@ -102,31 +98,33 @@ const move = (idx, dir) => {
   existing.value[idx] = existing.value[to]
   existing.value[to] = a
 }
-const setPrimary = (ph) => {
-  if (ph._delete) return
-  primaryId.value = ph.id
-}
-const toggleDelete = (ph) => {
-  ph._delete = !ph._delete
-  if (ph._delete && primaryId.value === ph.id) primaryId.value = null
-}
+const setPrimary = (ph) => { if (!ph._delete) primaryId.value = ph.id }
+const toggleDelete = (ph) => { ph._delete = !ph._delete; if (ph._delete && primaryId.value === ph.id) primaryId.value = null }
+const toggleBlur   = (ph) => { if (ph.id && !ph._delete) ph._blur = !ph._blur }
 
-/* ====== ぼかし解除承認/否認 ====== */
+/* ====== ぼかし解除（プロフィール/写真） ====== */
 const approve = (permId) => {
   const id = form.id; if (!id) return
-  const url = urlFor('casts.unblur.approve', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/approve`)
-  router.post(url, { expires_at: null })
+  router.post(urlFor('casts.unblur.approve', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/approve`), { expires_at: null })
 }
 const deny = (permId) => {
   const id = form.id; if (!id) return
-  const url = urlFor('casts.unblur.deny', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/deny`)
-  router.post(url)
+  router.post(urlFor('casts.unblur.deny', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/deny`))
+}
+const approvePhoto = (perm) => {
+  const photoId = perm.photo_id; if (!photoId) return
+  router.post(urlFor('photos.unblur.approve', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/approve`), { expires_at: null })
+}
+const denyPhoto = (perm) => {
+  const photoId = perm.photo_id; if (!photoId) return
+  router.post(urlFor('photos.unblur.deny', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/deny`))
 }
 
-/* ====== 送信 ====== */
+/* ====== 保存 ====== */
 const submit = () => {
   form.transform((data) => {
     const fd = new FormData()
+    // 基本
     fd.append("nickname", data.nickname ?? "")
     if (data.rank !== "") fd.append("rank", data.rank)
     if (data.age !== "") fd.append("age", data.age)
@@ -139,21 +137,36 @@ const submit = () => {
     ;(data.tag_ids || []).forEach(id => fd.append("tag_ids[]", id))
     fd.append("freeword", data.freeword ?? "")
 
+    // 旧・単発
     if (data.photo instanceof File) fd.append("photo", data.photo)
+    // 複数追加
     newFiles.value.forEach(f => fd.append("photos[]", f))
 
+    // 並び
     existing.value.forEach((ph, i) => {
       if (!ph.id) return
       fd.append(`orders[${i}][id]`, ph.id)
       fd.append(`orders[${i}][order]`, i + 1)
     })
+    // 削除
     existing.value.filter(ph => ph._delete && ph.id).forEach(ph => fd.append("delete_photo_ids[]", ph.id))
+    // メイン
     if (primaryId.value) fd.append("primary_photo_id", primaryId.value)
+    // ぼかしON
+    existing.value
+      .filter(ph => ph.id && ph._blur && !ph._delete)
+      .forEach(ph => fd.append('blur_on_ids[]', ph.id))
+
     return fd
   }).post(urlFor('cast.profile.update', {}, '/cast/profile'), {
     forceFormData: true,
     preserveScroll: true,
-    onSuccess: () => { newFiles.value = [] }
+    onSuccess: () => {
+      form.photo = null
+      newFiles.value = []
+      // 最新の cast だけ再取得 → watch が existing/_blur を再構築
+      router.reload({ only: ['cast'] })
+    }
   })
 }
 
@@ -166,20 +179,6 @@ const toggleTagId = (id) => {
 /* ====== ページ/ユーザー ====== */
 const page = usePage()
 const authedUser = computed(() => page.props?.value?.auth?.user ?? null)
-
-/* ====== 写真ごとの承認/否認 ====== */
-const approvePhoto = (perm) => {
-  const photoId = perm.photo_id
-  if (!photoId) return
-  const url = urlFor('photos.unblur.approve', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/approve`)
-  router.post(url, { expires_at: null })
-}
-const denyPhoto = (perm) => {
-  const photoId = perm.photo_id
-  if (!photoId) return
-  const url = urlFor('photos.unblur.deny', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/deny`)
-  router.post(url)
-}
 
 /* ====== LINE 連携（リンクは常時表示） ====== */
 const line = ref({
@@ -202,7 +201,7 @@ const viteBotQr  = import.meta.env.VITE_LINE_BOT_QR || null
 const addUrl = computed(() => lineBotUrl.value || envBotUrl.value || viteBotUrl)
 const addQr  = computed(() => lineBotQr.value  || envBotQr.value  || viteBotQr)
 
-/** 連携コード発行（POSTのみ。開くのは上のリンクが担当） */
+/** 連携コード発行（サーバが flash.line を返す想定） */
 const startLineLink = async () => {
   if (lineLinking.value) return
   lineLinking.value = true
@@ -211,9 +210,8 @@ const startLineLink = async () => {
     await router.post(url, {}, {
       preserveScroll: true,
       onSuccess: (inertiaPage) => {
-        // まず flash で受け取る（入っていれば即反映）
-        const props = inertiaPage?.props ?? page.props?.value ?? {}
-        const payload = props.line ?? props.flash?.line ?? null
+        const p = inertiaPage?.props ?? page.props?.value ?? {}
+        const payload = p.line ?? p.flash?.line ?? null
         if (payload) {
           lineCode.value   = payload?.code ?? null
           lineBotUrl.value = payload?.bot_url ?? null
@@ -225,8 +223,7 @@ const startLineLink = async () => {
         alert('連携コードの発行に失敗しました（ルート未定義/CSRF/権限など）。')
       },
       onFinish: async () => {
-        // ★ 最終的に peek で“必ず”最新を反映（flashが無くてもOK）
-        await refreshLineCode()
+        await refreshLineCode() // flash が無くても最新状態にする
       },
     })
   } finally {
@@ -234,11 +231,10 @@ const startLineLink = async () => {
   }
 }
 
-
+/** 連携コードの最新状態を取得（JSONの簡易API） */
 const refreshLineCode = async () => {
   try {
     const url = urlFor('line.link.peek', {}, '/line/link/peek')
-    // Inertiaのrouterでも良いですが、素のfetchが手軽です
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) return
     const json = await res.json()
@@ -248,6 +244,7 @@ const refreshLineCode = async () => {
   } catch (e) { console.error('refreshLineCode failed', e) }
 }
 
+/** 連携ステータス確認 */
 const checkLineStatus = async () => {
   const url = urlFor('line.link.status', {}, '/line/link/status')
   await router.get(url, {}, {
@@ -263,14 +260,15 @@ const checkLineStatus = async () => {
   })
 }
 
+/** テスト通知 */
 const sendLineTest = async () => {
   const url = urlFor('line.push.test', {}, '/line/push/test')
   await router.post(url, {}, {
     preserveScroll: true,
     onSuccess: (inertiaPage) => {
-      const props = inertiaPage?.props ?? page.props?.value ?? {}
-      const ok = props.flash?.success ?? props.success ?? null
-      const err = props.flash?.error ?? props.error ?? null
+      const p = inertiaPage?.props ?? page.props?.value ?? {}
+      const ok = p.flash?.success ?? p.success ?? null
+      const err = p.flash?.error   ?? p.error   ?? null
       if (ok) alert(ok)
       if (err) alert(err)
     },
@@ -278,6 +276,7 @@ const sendLineTest = async () => {
   })
 }
 
+/** 連携解除 */
 const disconnectLine = async () => {
   const url = urlFor('line.link.disconnect', {}, '/line/link/disconnect')
   await router.delete(url, {
@@ -291,7 +290,7 @@ const disconnectLine = async () => {
   })
 }
 
-/* クリップボード */
+/** クリップボード */
 const copy = async (text) => {
   try { await navigator.clipboard.writeText(text) } catch {}
 }
@@ -300,12 +299,10 @@ const copy = async (text) => {
 <template>
   <AppLayout>
     <Head title="キャストプロフィール編集" />
-    <!-- ★ Safari 対策：外側は単純なflex、内側に max-h-dvh + min-h-0 + overflow-y-auto -->
     <div class="min-h-dvh w-screen bg-black flex justify-center md:py-6">
-      <div
-        class="relative w-full max-w-[390px] max-h-dvh mx-auto
-               bg-[url('/assets/imgs/back.png')] bg-no-repeat bg-center bg-[length:100%_100%]
-               overflow-y-auto min-h-0">
+      <div class="relative w-full max-w-[390px] max-h-dvh mx-auto
+                  bg-[url('/assets/imgs/back.png')] bg-no-repeat bg-center bg-[length:100%_100%]
+                  overflow-y-auto min-h-0">
         <div class="px-6 py-8 text-white/90">
 
           <h1 class="text-2xl font-semibold mb-6">プロフィール編集</h1>
@@ -352,24 +349,16 @@ const copy = async (text) => {
 
           <!-- スケジュール・その他リンク -->
           <div class="mb-4 flex flex-wrap gap-4 items-center">
-            <Link v-if="form.id" :href="`/casts/${form.id}/schedule`" class="text-sm underline text-yellow-200">
-              ● スケジュール編集へ
-            </Link>
-            <Link href="/tweets" class="text-sm underline text-yellow-200">
-              ● ツイート
-            </Link>
-            <Link href="/logout" method="post" as="button" class="text-sm underline text-yellow-200">
-              ● ログアウト
-            </Link>
+            <Link v-if="form.id" :href="`/casts/${form.id}/schedule`" class="text-sm underline text-yellow-200">● スケジュール編集へ</Link>
+            <Link href="/tweets" class="text-sm underline text-yellow-200">● ツイート</Link>
+            <Link href="/logout" method="post" as="button" class="text-sm underline text-yellow-200">● ログアウト</Link>
           </div>
 
           <!-- ============== LINE 連携 ============== -->
           <div class="mb-6 p-4 rounded border border-white/20 bg-white/5">
             <div class="flex items-center justify-between mb-2">
               <h3 class="font-semibold">LINEで通知を受け取る</h3>
-              <span v-if="line.linked" class="text-xs px-2 py-1 rounded bg-green-600 text-white">
-                連携済み
-              </span>
+              <span v-if="line.linked" class="text-xs px-2 py-1 rounded bg-green-600 text-white">連携済み</span>
             </div>
 
             <!-- 連携済み -->
@@ -393,26 +382,17 @@ const copy = async (text) => {
               </ol>
 
               <div class="flex flex-wrap items-center gap-2">
-                <!-- 初期表示から必ず開ける（応答URL→line_env→Vite） 
-                <a v-if="!line.linked && LIFF_ID"
-                   :href="`https://liff.line.me/${LIFF_ID}`"
-                   class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">
-                  LINEで即連携（ワンタップ）
-                </a>
-                -->
-                <!-- 連携コード発行（POSTのみ。開くのは上のリンクが担当） -->
-                <button type="button"
-                        @click="startLineLink"
-                        :disabled="lineLinking"
-                        class="px-3 py-1 rounded bg-yellow-200 text-black text-sm">
-                  連携コードを発行
-                </button>
+                <a v-if="addUrl" :href="addUrl" target="_blank" rel="noopener"
+                   class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">友だち追加（LINEを開く）</a>
 
-                <button type="button"
-                        @click="checkLineStatus"
-                        class="px-3 py-1 rounded bg-white/10 text-white text-sm">
-                  連携を確認
-                </button>
+                <a v-if="LIFF_ID" :href="`https://liff.line.me/${LIFF_ID}`"
+                   class="px-3 py-1 rounded bg-[#06C755] text-white text-sm">LINEで即連携</a>
+
+                <button type="button" @click="startLineLink" :disabled="lineLinking"
+                        class="px-3 py-1 rounded bg-yellow-200 text-black text-sm">連携コードを発行</button>
+
+                <button type="button" @click="checkLineStatus"
+                        class="px-3 py-1 rounded bg-white/10 text-white text-sm">連携を確認</button>
               </div>
 
               <div v-if="addQr" class="pt-2">
@@ -437,19 +417,16 @@ const copy = async (text) => {
             <div>
               <label class="block mb-1 text-sm">ニックネーム</label>
               <input v-model="form.nickname" type="text" class="w-full h-11 rounded-md px-3 text-black" />
-              <p v-if="form.errors.nickname" class="text-xs text-red-300 mt-1">{{ form.errors.nickname }}</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block mb-1 text-sm">ランク</label>
                 <input v-model.number="form.rank" type="number" min="0" max="99" class="w-full h-11 rounded-md px-3 text-black" />
-                <p v-if="form.errors.rank" class="text-xs text-red-300 mt-1">{{ form.errors.rank }}</p>
               </div>
               <div>
                 <label class="block mb-1 text-sm">年齢</label>
                 <input v-model.number="form.age" type="number" min="18" max="99" class="w-full h-11 rounded-md px-3 text-black" />
-                <p v-if="form.errors.age" class="text-xs text-red-300 mt-1">{{ form.errors.age }}</p>
               </div>
             </div>
 
@@ -457,12 +434,10 @@ const copy = async (text) => {
               <div>
                 <label class="block mb-1 text-sm">身長(cm)</label>
                 <input v-model.number="form.height_cm" type="number" min="120" max="220" class="w-full h-11 rounded-md px-3 text-black" />
-                <p v-if="form.errors.height_cm" class="text-xs text-red-300 mt-1">{{ form.errors.height_cm }}</p>
               </div>
               <div>
                 <label class="block mb-1 text-sm">カップ</label>
                 <input v-model="form.cup" type="text" placeholder="A〜H等" class="w-full h-11 rounded-md px-3 text-black" />
-                <p v-if="form.errors.cup" class="text-xs text-red-300 mt-1">{{ form.errors.cup }}</p>
               </div>
             </div>
 
@@ -473,7 +448,6 @@ const copy = async (text) => {
                 <option>北海道・東北</option><option>関東</option><option>中部</option>
                 <option>近畿</option><option>中国・四国</option><option>九州・沖縄</option>
               </select>
-              <p v-if="form.errors.area" class="text-xs text-red-300 mt-1">{{ form.errors.area }}</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -496,7 +470,6 @@ const copy = async (text) => {
             <div>
               <label class="block mb-1 text-sm">MBTI</label>
               <input v-model="form.mbti" maxlength="4" placeholder="ENFPなど" class="w-full h-11 rounded-md px-3 text-black uppercase" />
-              <p v-if="form.errors.mbti" class="text-xs text-red-300 mt-1">{{ form.errors.mbti }}</p>
             </div>
 
             <div>
@@ -514,7 +487,6 @@ const copy = async (text) => {
             <div>
               <label class="block mb-1 text-sm">自己紹介</label>
               <textarea v-model="form.freeword" rows="4" class="w-full rounded-md px-3 py-2 text-black"></textarea>
-              <p v-if="form.errors.freeword" class="text-xs text-red-300 mt-1">{{ form.errors.freeword }}</p>
             </div>
 
             <!-- =============== 写真管理（複数） =============== -->
@@ -528,17 +500,43 @@ const copy = async (text) => {
               </div>
 
               <div v-if="existing.length" class="grid grid-cols-3 gap-3">
-                <div v-for="(ph, idx) in existing" :key="ph.id" class="relative border border-white/20 rounded overflow-hidden">
-                  <img :src="ph.url" class="w-full h-28 object-cover" />
+                <div v-for="(ph, idx) in existing" :key="ph.id"
+                     class="relative border border-white/20 rounded overflow-hidden">
+                  <!-- プレビュー：ONなら軽くボカす -->
+                  <img :src="ph.url"
+                       class="w-full h-28 object-cover transition"
+                       :class="ph._blur ? 'blur-sm scale-[1.03]' : ''" />
+
                   <div class="absolute top-1 left-1 flex gap-1">
-                    <button type="button" @click="move(idx,-1)" class="px-1 py-0.5 text-xs bg-black/50 text-white rounded">↑</button>
-                    <button type="button" @click="move(idx, 1)" class="px-1 py-0.5 text-xs bg-black/50 text白 rounded">↓</button>
+                    <button type="button" @click="move(idx,-1)"
+                            class="px-1 py-0.5 text-xs bg-black/50 text-white rounded">↑</button>
+                    <button type="button" @click="move(idx, 1)"
+                            class="px-1 py-0.5 text-xs bg-black/50 text-white rounded">↓</button>
                   </div>
+
                   <div class="absolute top-1 right-1">
                     <button type="button"
-                            :class="['px-1 py-0.5 text-xs rounded', ph.id===primaryId && !ph._delete ? 'bg-amber-400 text-black' : 'bg-black/50 text-white']"
+                            :class="['px-1 py-0.5 text-xs rounded',
+                                     ph.id===primaryId && !ph._delete ? 'bg-amber-400 text-black'
+                                                                      : 'bg-black/50 text-white']"
                             @click="setPrimary(ph)">★</button>
                   </div>
+
+                  <!-- ぼかしトグル -->
+                  <div class="absolute bottom-1 left-1">
+                    <button type="button"
+                            @click="toggleBlur(ph)"
+                            :disabled="!ph.id || ph._delete"
+                            :class="[
+                              'px-1.5 py-0.5 text-[11px] rounded',
+                              (!ph.id || ph._delete) ? 'bg-black/30 text-white/50 cursor-not-allowed'
+                                                     : (ph._blur ? 'bg-black/70 text-yellow-200 ring-1 ring-yellow-300'
+                                                                 : 'bg-black/40 text-white')
+                            ]">
+                      {{ ph._blur ? 'ぼかしON' : 'ぼかしOFF' }}
+                    </button>
+                  </div>
+
                   <button type="button"
                           class="absolute bottom-1 right-1 px-1.5 py-0.5 text-xs bg-red-600 text-white rounded"
                           @click="toggleDelete(ph)">
