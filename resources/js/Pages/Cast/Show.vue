@@ -16,9 +16,7 @@ const urlFor = (name, params = {}, fallback = "") => {
 }
 
 const props = defineProps({
-  // 期待する shape:
   // cast.photos: [{ id, url, sort_order, is_primary:boolean, should_blur:boolean, unblur?: {granted?:bool,status?:'approved'|'pending'} }]
-  // cast.viewer_has_unblur_access?: boolean
   cast: { type: Object, required: true },
   schedule: { type: Array, default: () => [] },
   unblur: { type: Object, default: () => ({ requested:false, status:null }) },
@@ -27,7 +25,6 @@ const props = defineProps({
 /* ====== 写真 ====== */
 const gallery = computed(() => Array.isArray(props.cast?.photos) ? props.cast.photos : [])
 
-/** 後方互換: photo_path を URL に変換して一致比較用 */
 const photoPathUrl = computed(() =>
   props.cast?.photo_path ? `/storage/${props.cast.photo_path}` : null
 )
@@ -43,10 +40,9 @@ const pickCurrent = (arr) => {
   }
   return arr[0]
 }
-
 const current = ref(pickCurrent(gallery.value))
 
-/** props 更新に追従（保存直後の参照ズレ防止） */
+/** props 更新に追従 */
 watch(gallery, (photos) => {
   const arr = photos ?? []
   if (!current.value) {
@@ -57,19 +53,13 @@ watch(gallery, (photos) => {
   current.value = updated ?? pickCurrent(arr)
 })
 
-/* ====== ぼかし判定（要件: 初期は全て非ぼかし / 写真にフラグがあり未許可の時だけぼかす / primary は常に非ぼかし） ====== */
-const hasProfileAccess = computed(() => !!props.cast?.viewer_has_unblur_access) // プロフィール全体の許可
-
-// 写真単位で閲覧可能か（プロフィール全体許可 or 個別許可）
+/* ====== ぼかし判定 ====== */
+const hasProfileAccess = computed(() => !!props.cast?.viewer_has_unblur_access)
 const photoAllowed = (p) => {
   const u = p?.unblur ?? {}
   return hasProfileAccess.value || u.granted === true || u.status === 'approved'
 }
-
-// その写真をぼかすべきか
 const photoShouldBlur = (p) => p?.should_blur === true && !photoAllowed(p)
-
-// メイン表示のぼかし（primary は常にオフ）
 const shouldBlur = computed(() => {
   const cur = current.value
   if (!cur) return false
@@ -113,7 +103,6 @@ const startChat = () => {
   )
 }
 const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
-
 </script>
 
 <template>
@@ -132,30 +121,39 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
           <img src="/assets/icons/like-badge.png" class="h-8" alt="like"/>
         </div>
 
-        <!-- メイン写真 -->
-        <div class="mt-2 relative aspect-[3/2] bg-white rounded overflow-hidden ring-1 ring-black/10">
+        <!-- メイン写真：原寸優先／はみ出す時だけ縮小（縦は --maxh 上限） -->
+        <div
+          class="mt-2 relative bg-white rounded overflow-hidden ring-1 ring-black/10 flex items-center justify-center"
+          style="--maxh: 52vh;"
+        >
           <img
             :src="current
                     ? current.url
                     : (props.cast.photo_path ? `/storage/${props.cast.photo_path}` : '/assets/imgs/placeholder.png')"
-            class="w-full h-full object-cover transition will-change-transform"
-            :class="shouldBlur ? 'blur-lg scale-105' : ''"
+            class="img-natural-fit transition"
+            :class="shouldBlur ? 'blur-lg' : ''"
             draggable="false"
             alt="main"
           />
-          <div v-if="shouldBlur" class="absolute top-2 left-2 bg-black/45 text-white text-xs px-2 py-1 rounded">🔒 ぼかし中</div>
+          <div v-if="shouldBlur" class="absolute top-2 left-2 bg-black/45 text-white text-xs px-2 py-1 rounded">
+            🔒 ぼかし中
+          </div>
         </div>
 
-        <!-- サムネ（横スクロール） -->
+        <!-- サムネ（横スクロール）：非クロップ（レターボックス可） -->
         <div v-if="gallery.length" class="mt-3 relative">
           <div class="flex gap-3 overflow-x-auto no-scrollbar -mx-2 px-2 py-1">
             <div
               v-for="p in gallery" :key="p.id"
-              class="shrink-0 w-28 h-20 rounded overflow-hidden ring-1 ring-black/20 relative cursor-pointer"
+              class="shrink-0 w-28 h-20 rounded overflow-hidden ring-1 ring-black/20 relative cursor-pointer bg-black/20"
               @click="current = p" role="button" tabindex="0"
             >
-              <img :src="p.url" class="w-full h-full object-cover transition"
-                   :class="photoShouldBlur(p) ? 'blur-md scale-[1.03]' : ''" />
+              <img
+                :src="p.url"
+                class="img-no-crop transition"
+                :class="photoShouldBlur(p) ? 'blur-md scale-[1.03]' : ''"
+                alt=""
+              />
 
               <!-- 個別申請ボタン（ぼかし中・未申請の時だけ） -->
               <div v-if="photoShouldBlur(p) && !(p.unblur?.requested)"
@@ -184,7 +182,7 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
           <div class="text-[#ffcc66]">★ ★ ★ ★ ☆</div>
 
           <div class="flex items-center gap-3">
-            <!-- プロファイル単位のぼかし解除申請を使う場合は有効化
+            <!-- プロファイル単位のぼかし解除申請（必要なら有効化）
             <button
               v-if="!hasProfileAccess && !hasUnblurRequest"
               @click="requestUnblurProfile"
@@ -198,18 +196,14 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
             </span>
             -->
 
-
-<Link
-  as="button"
-  method="post"
-  :href="urlFor('casts.startChat', props.cast.id, `/casts/${props.cast.id}/start-chat`)"
-  class="px-4 py-2 rounded bg-[#e7d7a0] text-black shadow"
->
-  ギフトを贈る
-</Link>
-<!--
-            <button class="px-4 py-2 rounded bg-[#a99a86] text-black shadow">指名する</button>
--->
+            <Link
+              as="button"
+              method="post"
+              :href="urlFor('casts.startChat', props.cast.id, `/casts/${props.cast.id}/start-chat`)"
+              class="px-4 py-2 rounded bg-[#e7d7a0] text-black shadow"
+            >
+              ギフトを贈る
+            </Link>
           </div>
         </div>
       </section>
@@ -259,36 +253,36 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
         </div>
       </section>
     </div>
-    <!-- 固定CTA: フッターの上に常に表示 -->
-<div class="fixed z-[60] pointer-events-none right-4"
-     :style="{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }">
-  <Link
-    as="button"
-    method="post"
-    :href="startChatHref"
-    class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium
-           shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105
-           active:translate-y-[1px] transition flex items-center gap-2"
-  >
-    <img src="/assets/icons/message.png" alt="" class="h-5 w-5" />
-    メッセージ
-  </Link>
-</div>
-<div class="fixed z-[60] pointer-events-none left-4"
-     :style="{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }">
-  <Link
-    as="button"
-    method="post"
-    :href="startChatHref"
-    class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium
-           shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105
-           active:translate-y-[1px] transition flex items-center gap-2"
-  >
-    <img src="/assets/icons/message.png" alt="" class="h-5 w-5" />
-    指名する
-  </Link>
-</div>
 
+    <!-- 固定CTA -->
+    <div class="fixed z-[60] pointer-events-none right-4"
+         :style="{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }">
+      <Link
+        as="button"
+        method="post"
+        :href="startChatHref"
+        class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium
+               shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105
+               active:translate-y-[1px] transition flex items-center gap-2"
+      >
+        <img src="/assets/icons/message.png" alt="" class="h-5 w-5" />
+        メッセージ
+      </Link>
+    </div>
+    <div class="fixed z-[60] pointer-events-none left-4"
+         :style="{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }">
+      <Link
+        as="button"
+        method="post"
+        :href="startChatHref"
+        class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium
+               shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105
+               active:translate-y-[1px] transition flex items-center gap-2"
+      >
+        <img src="/assets/icons/message.png" alt="" class="h-5 w-5" />
+        指名する
+      </Link>
+    </div>
   </AppLayout>
 </template>
 

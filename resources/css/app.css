@@ -5,3 +5,22 @@
 /* 横スクロールのスクロールバー非表示（任意） */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@layer components {
+  .img-no-crop {
+    object-fit: contain !important;
+    object-position: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+.img-natural-fit {
+    object-fit: contain !important;
+    object-position: center !important;
+    max-width: 100% !important;       /* 横はコンテナ幅を上限に縮小 */
+    max-height: var(--maxh, 52vh);     /* 縦は画面高の約半分を上限に縮小（任意） */
+    width: auto !important;            /* 原寸維持（拡大しない） */
+    height: auto !important;           /* 原寸維持（拡大しない） */
+    display: block;
+  }
+}

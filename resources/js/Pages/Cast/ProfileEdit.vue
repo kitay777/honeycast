@@ -604,9 +604,11 @@ const linkViaLiff = async () => {
                 <div v-for="(ph, idx) in existing" :key="ph.id"
                      class="relative border border-white/20 rounded overflow-hidden">
                   <!-- プレビュー：ONなら軽くボカす -->
-                  <img :src="ph.url"
-                       class="w-full h-28 object-cover transition"
-                       :class="ph._blur ? 'blur-sm scale-[1.03]' : ''" />
+                  <div class="w-full max-h-48 bg-black/30 flex items-center justify-center">
+                    <img :src="ph.url"
+                         class="max-h-48 w-full object-contain transition"
+                         :class="ph._blur ? 'blur-sm' : ''" />
+                  </div>
 
                   <div class="absolute top-1 left-1 flex gap-1">
                     <button type="button" @click="move(idx,-1)"
