@@ -22,11 +22,16 @@ const handleNo = () => {
     >
       <!-- 中央コンテンツ -->
       <div class="absolute inset-0 z-10 flex flex-col items-center justify-center text-center space-y-6">
+        <img
+            src="/assets/imgs/logo.png"
+            alt="Site Logo"
+            class="w-32 h-32 mx-auto object-contain"
+        />
         <img src="/assets/imgs/18.png" alt="18禁止" class="w-32 h-32 mx-auto" />
         <p class="text-xl text-yellow-200">あなたは18歳以上ですか？</p>
         <div class="flex justify-center gap-6 mt-2">
           <button @click="handleYes"
-            class="px-6 py-3 rounded-md bg-yellow-200 text-black font-bold shadow-md hover:scale-105 transition">
+            class="px-6 rounded-md bg-yellow-200 text-black font-bold shadow-md hover:scale-105 transition">
             Yes
           </button>
           <button @click="handleNo"

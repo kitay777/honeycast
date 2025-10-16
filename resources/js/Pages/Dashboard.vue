@@ -16,6 +16,8 @@ const props = defineProps({
   login:   { type: Array, default: () => [] },
   newbies: { type: Array, default: () => [] },
   roster:  { type: Array, default: () => [] },
+  text_banners: { type: Array, default: () => [] }, // [{id,message,url,speed,bg_color,text_color}]
+  ad_banners:   { type: Array, default: () => [] }, // [{id,src,url,height}]
 })
 
 /* ====== 下段タブ ====== */
@@ -55,6 +57,20 @@ const scrollBy = (elRef, dir = 1) => {
   const delta = Math.round(el.clientWidth * 0.9) * dir
   el.scrollBy({ left: delta, behavior: 'smooth' })
 }
+const bannerStyle = computed(() => {
+  const first = props.text_banners[0] ?? {}
+  return {
+    bg: first.bg_color || '#111111',
+    color: first.text_color || '#FFE08A',
+    speed: first.speed || 60, // px/s想定
+  }
+})
+
+/** アニメ速度（必要なら数値調整してね） */
+const marqueeDuration = computed(() => {
+  // 単純化: speed が速いほど短く。最低8秒。
+  return `${Math.max(8, 2000 / (bannerStyle.value.speed || 60))}s`
+})
 </script>
 
 <template>
@@ -65,6 +81,60 @@ const scrollBy = (elRef, dir = 1) => {
       <!-- =========================
            検索結果（横スクロール）
            ========================= -->
+           <!-- ===== テキスト・マルチ（右→左） ===== -->
+<!-- １本帯のテキストバナー -->
+<section v-if="props.text_banners.length" class="mb-3">
+  <div class="relative overflow-hidden rounded-md"
+       :style="{ backgroundColor: bannerStyle.bg, color: bannerStyle.color }">
+
+    <!-- 動かすトラック（CSS変数で速度を渡す） -->
+    <div class="marquee-track"
+         :style="{ '--dur': marqueeDuration }">
+      <!-- 2周分を連結 -->
+      <div class="marquee-inner" v-for="rep in 2" :key="rep">
+        <template v-for="(tb, i) in props.text_banners" :key="`${rep}-${tb.id}`">
+          <component :is="tb.url ? 'a' : 'span'"
+                     :href="tb.url || undefined" target="_blank" rel="noopener"
+                     class="inline-block px-4 py-2 hover:underline">
+            {{ tb.message }}
+          </component>
+          <span v-if="i !== props.text_banners.length - 1"
+                aria-hidden="true"
+                class="opacity-60 px-2">|</span>
+        </template>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ===== 画像広告（左スライド, 高さ≈120px） ===== -->
+<section v-if="props.ad_banners.length" class="mb-4">
+  <div class="relative overflow-hidden rounded-md bg-black/30">
+    <!-- ドット or 矢印を後で付けるならここ -->
+    <div class="flex"
+         :style="{
+           // 画像枚数に応じて往復ではなく“無限左流し”
+           animation: 'slide-left linear infinite',
+           animationDuration: `${Math.max(12, 4 * (props.ad_banners.length || 1))}s`,
+           width: 'max-content',
+         }">
+      <!-- 無限ループのために2周分 -->
+      <template v-for="rep in 2" :key="rep">
+        <a v-for="ad in props.ad_banners" :key="`${rep}-${ad.id}`"
+           :href="ad.url || undefined" target="_blank" rel="noopener"
+           class="block shrink-0">
+          <img :src="ad.src"
+               :alt="`ad-${ad.id}`"
+               class="object-contain"
+               :style="{ height: `${ad.height || 120}px` }">
+        </a>
+      </template>
+    </div>
+  </div>
+</section>
+
       <section v-if="props.search_applied" class="mb-8">
         <div class="inline-block px-4 py-1 rounded bg-[#6b4b17] border border-[#d1b05a] text-[18px] tracking-[0.3em]">
           検索結果（{{ props.search_results.length }}）
@@ -196,4 +266,38 @@ const scrollBy = (elRef, dir = 1) => {
       </template>
     </div>
   </AppLayout>
+
+
+
 </template>
+
+<style>
+/* トラック自体を動かす。max-content で中身の幅にフィット */
+.marquee-track {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  width: max-content;
+  animation: marquee-left var(--dur) linear infinite;
+  will-change: transform;
+}
+
+/* 2周分を横並びにする器（flexでOK） */
+.marquee-inner {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* keyframes は “scoped なし” で定義（Safari等での不具合回避） */
+@keyframes marquee-left {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); } /* 2周分の半分で継ぎ目なし */
+}
+
+/* 画像バナーも同様の考えで動かすならこちらもグローバルに */
+@keyframes slide-left {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+</style>
+

@@ -6,12 +6,18 @@ namespace App\Http\Controllers;
 use App\Models\CastProfile;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Models\TextBanner;
+use App\Models\AdBanner;
 
 class HomeController extends Controller
 {
     public function index(Request $request)
     {
-        $viewer = $request->user();
+
+    $viewer = $request->user();
+
+    $textBanners = TextBanner::active()->get(['id','message','url','speed','bg_color','text_color']);
+    $adBanners   = AdBanner::active()->get(['id','image_path','url','height','priority']);
 
         // ====== 検索条件の取り出し ======
         $f = $request->only([
@@ -23,7 +29,7 @@ class HomeController extends Controller
         })->isNotEmpty();
 
         // ブラー計算を行う変換クロージャ
-        $toCard = function (CastProfile $c) use ($viewer) {
+        $toCard = function (CastProfile $c) use ($viewer, $textBanners, $adBanners) {
         
             return [
                 'id'                       => $c->id,
@@ -94,6 +100,13 @@ class HomeController extends Controller
             'login' => $login,
             'newbies' => $newbies,
             'roster' => $roster,
+            'text_banners' => $textBanners,
+            'ad_banners'   => $adBanners->map(fn($b) => [
+            'id' => $b->id,
+            'url' => $b->url,
+            'height' => $b->height,
+            'src' => $b->public_url, // アクセサ
+            ]),
         ]);
     }
 }

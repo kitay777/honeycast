@@ -38,6 +38,12 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as VerifyCsrfTokenMidd
 use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\GameController;
 
+Route::middleware(['auth','can:admin']) // 実プロジェクトの権限に合わせて
+  ->prefix('admin')->name('admin.')
+  ->group(function(){
+    Route::resource('text-banners', \App\Http\Controllers\Admin\TextBannerController::class);
+    Route::resource('ad-banners',   \App\Http\Controllers\Admin\AdBannerController::class);
+  });
 // 公開
 Route::get('/games',            [GameController::class,'index'])->name('games.index');
 Route::get('/games/{game:slug}',[GameController::class,'show'])->name('games.show');
