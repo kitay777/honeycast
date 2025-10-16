@@ -49,6 +49,12 @@ use App\Http\Controllers\HotelController as PublicHotelController;
 use App\Http\Controllers\CastLikeController;
 
 Route::middleware('auth')->group(function () {
+    Route::get('/my/likes', [CastLikeController::class, 'index'])->name('likes.index');
+    // 既存の like/unlike ルートはそのまま
+    // Route::post('/casts/{cast}/like', ...)->name('casts.like');
+    // Route::delete('/casts/{cast}/like', ...)->name('casts.unlike');
+});
+Route::middleware('auth')->group(function () {
     Route::post('/casts/{cast}/like',  [CastLikeController::class, 'store'])->name('casts.like');
     Route::delete('/casts/{cast}/like',[CastLikeController::class, 'destroy'])->name('casts.unlike');
 });

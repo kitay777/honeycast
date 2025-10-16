@@ -166,10 +166,10 @@ onBeforeUnmount(() => {
           @click="closeMenu"
         >ツイート</Link>
         <Link
-          href="/tweets"
+          href="/my/likes"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
-        >ツイート</Link>
+        >いいね</Link>
         <Link
           href="/ranking"
           class="block px-5 py-4 hover:bg-white/10"
@@ -181,7 +181,7 @@ onBeforeUnmount(() => {
           @click="closeMenu"
         >スケジュール</Link>
         <Link
-          href="/newface"
+          href="/ranking"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
         >NEW FACE</Link>

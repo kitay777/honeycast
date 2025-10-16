@@ -50,13 +50,18 @@ const toggleLike = () => {
   emit('update:liked', next)
 
   const href   = urlFor(next ? 'casts.like' : 'casts.unlike', props.cast.id)
-  const method = next ? router.post : router.delete
-
-  method(href, {}, {
+  const baseOpts = {
     preserveScroll: true,
     onFinish: () => { posting.value = false },
     onError:  () => { localLiked.value = !next; emit('update:liked', !next); posting.value = false },
-  })
+  }
+  if (next) {
+    // いいね（POST は data を渡すシグネチャ）
+    router.post(href, {}, baseOpts)
+  } else {
+    // 解除（DELETE は options だけ）
+    router.delete(href, baseOpts)
+  }
 }
 
 /** ブラー判定（あなたのロジックを踏襲） */

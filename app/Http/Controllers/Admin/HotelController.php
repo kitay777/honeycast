@@ -36,7 +36,6 @@ class HotelController extends Controller
                 'name'   => $h->name,
                 'area'   => $h->area,
                 'active' => $h->is_active,
-                'liked'      => in_array($h->id, $likedIds, true),
                 'image'  => $h->cover_image_path ? Storage::disk('public')->url($h->cover_image_path) : null,
             ]),
             'filters' => ['q' => $kw],
