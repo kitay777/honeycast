@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\TextBanner;
 use App\Models\AdBanner;
-
+use App\Models\NewsItem;
 class HomeController extends Controller
 {
     public function index(Request $request)
@@ -18,7 +18,7 @@ class HomeController extends Controller
 
     $textBanners = TextBanner::active()->get(['id','message','url','speed','bg_color','text_color']);
     $adBanners   = AdBanner::active()->get(['id','image_path','url','height','priority']);
-
+    $news = NewsItem::active()->take(10)->get(['id','title','body','url','published_at']);
         // ====== 検索条件の取り出し ======
         $f = $request->only([
             'freeword','rank_min','rank_max','age_min','age_max','area',
@@ -102,11 +102,13 @@ class HomeController extends Controller
             'roster' => $roster,
             'text_banners' => $textBanners,
             'ad_banners'   => $adBanners->map(fn($b) => [
-            'id' => $b->id,
-            'url' => $b->url,
-            'height' => $b->height,
-            'src' => $b->public_url, // アクセサ
+                'id' => $b->id,
+                'url' => $b->url,
+                'height' => $b->height,
+                'src' => $b->public_url,
             ]),
+
+            'news' => $news,
         ]);
     }
 }

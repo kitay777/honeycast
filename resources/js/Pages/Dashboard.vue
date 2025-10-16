@@ -18,6 +18,7 @@ const props = defineProps({
   roster:  { type: Array, default: () => [] },
   text_banners: { type: Array, default: () => [] }, // [{id,message,url,speed,bg_color,text_color}]
   ad_banners:   { type: Array, default: () => [] }, // [{id,src,url,height}]
+  news: { type: Array, default: () => [] },
 })
 
 /* ====== 下段タブ ====== */
@@ -263,7 +264,49 @@ const marqueeDuration = computed(() => {
             該当のキャストがいません。
           </div>
         </div>
+
+
+
       </template>
+              <!-- 新着情報（最新10件） -->
+        <section v-if="props.news.length" class="mb-4">
+          <div class="rounded-md bg-black/40 border border-yellow-900/40">
+            <div class="px-4 py-2 text-yellow-200 tracking-[0.3em] border-b border-yellow-900/40">
+              新着情報
+            </div>
+            <ul class="divide-y divide-white/10">
+              <li v-for="n in props.news" :key="n.id" class="px-4 py-3">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+                  <time class="text-xs text-white/60 min-w-28">
+                    {{ n.published_at ?? '' }}
+                  </time>
+                  <div class="flex-1">
+                    <component :is="n.url ? 'a' : 'span'"
+                              :href="n.url || undefined" target="_blank" rel="noopener"
+                              class="font-semibold hover:underline">
+                      {{ n.title }}
+                    </component>
+                    <p v-if="n.body" class="text-sm text-white/80 mt-1 line-clamp-2">
+                      {{ n.body }}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
+        <div class="text-sm text-white/80">&copy; 2025 choco</div>
+          <div class="mt-2 text-xs leading-relaxed text-white/70 space-y-1">
+            <p>当店はエロ＋飲みのギャラ飲みのエロバーションです。</p>
+            <p>ピンクコンパニオンの都内バージョンのイメージです。</p>
+            <p>1対1はもちろん、団体でのご利用も可能です。</p>
+            <p>エ口くて楽しいゲームで盛り上がりましょう。</p>
+            <p>
+              一般的な性サービスも可能です。詳細は
+              <Link href="/system" class="underline underline-offset-2 hover:opacity-80">SYSTEM</Link>
+              よりご覧下さい。
+            </p>
+          </div>
     </div>
   </AppLayout>
 

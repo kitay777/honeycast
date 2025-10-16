@@ -37,7 +37,17 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as VerifyCsrfTokenMidd
 
 use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\Admin\NewsController;
+// routes/web.php
+use App\Http\Controllers\ScheduleController;
 
+Route::get('/schedule', [ScheduleController::class, 'index'])->name('schedule');
+
+Route::middleware(['auth','can:admin'])
+  ->prefix('admin')->name('admin.')
+  ->group(function () {
+    Route::resource('news', NewsController::class)->parameters(['news' => 'news']);
+});
 Route::middleware(['auth','can:admin']) // 実プロジェクトの権限に合わせて
   ->prefix('admin')->name('admin.')
   ->group(function(){
