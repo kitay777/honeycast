@@ -1,8 +1,10 @@
 <script setup>
+import AdminLayout from '@/Layouts/AdminLayout.vue'
 const props = defineProps({ items: Object })
 </script>
 
 <template>
+  <admin-layout active-key="News">
   <div class="p-6 text-black">
     <div class="flex justify-between mb-4">
       <h1 class="text-xl font-bold">新着情報</h1>
@@ -22,4 +24,5 @@ const props = defineProps({ items: Object })
       </tbody>
     </table>
   </div>
+  </admin-layout>
 </template>

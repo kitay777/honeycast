@@ -1,5 +1,6 @@
 <script setup>
 import { useForm, Link } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
 const props = defineProps({ item: Object })
 const isCreate = !props.item
 
@@ -19,6 +20,7 @@ const submit = () => {
 </script>
 
 <template>
+  <AdminLayout active-key="News">
   <div class="p-6 text-black space-y-4">
     <div class="flex items-center justify-between">
       <h1 class="text-xl font-bold">新着情報 {{ isCreate ? '新規' : `編集 #${props.item.id}` }}</h1>
@@ -66,4 +68,5 @@ const submit = () => {
       </button>
     </form>
   </div>
+  </AdminLayout>
 </template>
