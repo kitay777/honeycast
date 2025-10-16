@@ -1,39 +1,64 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue'
 import CastCard from '@/Components/Cast/CastCard.vue'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3' 
 
-/* ====== 受け取り props ====== */
+/* ====== 受け取り props（←最初に定義） ====== */
 const props = defineProps({
-  // 検索関連
   search_applied: { type: Boolean, default: false },
   search_results: { type: Array,  default: () => [] },
   search_filters: { type: Object, default: () => ({}) },
-
-  // 通常ダッシュボード
   today:   { type: Array, default: () => [] },
   login:   { type: Array, default: () => [] },
   newbies: { type: Array, default: () => [] },
   roster:  { type: Array, default: () => [] },
-  text_banners: { type: Array, default: () => [] }, // [{id,message,url,speed,bg_color,text_color}]
-  ad_banners:   { type: Array, default: () => [] }, // [{id,src,url,height}]
+  text_banners: { type: Array, default: () => [] },
+  ad_banners:   { type: Array, default: () => [] },
   news: { type: Array, default: () => [] },
 })
 
-/* ====== 下段タブ ====== */
+/* ====== 画像広告カルーセル（軽量版） ====== */
+const slide = ref(0)
+const transitioning = ref(false)
+const intervalMs = 3500 // 次のスライドまでの待ち時間
+const durationMs  = 500  // アニメ時間
+let timer = null
+
+const adCount = computed(() => props.ad_banners.length)
+
+const go = (idx) => {
+  if (!adCount.value) return
+  const next = (idx + adCount.value) % adCount.value
+  if (next === slide.value) return
+  transitioning.value = true
+  slide.value = next
+  window.setTimeout(() => (transitioning.value = false), durationMs)
+}
+const nextAd = () => go(slide.value + 1)
+const prevAd = () => go(slide.value - 1)
+
+const start = () => { stop(); if (adCount.value > 1) timer = setInterval(nextAd, intervalMs) }
+const stop  = () => { if (timer) { clearInterval(timer); timer = null } }
+const handleVisibility = () => { document.hidden ? stop() : start() }
+
+onMounted(() => {
+  start()
+  document.addEventListener('visibilitychange', handleVisibility, false)
+})
+onUnmounted(() => {
+  stop()
+  document.removeEventListener('visibilitychange', handleVisibility, false)
+})
+
+/* ====== 既存の計算系 ====== */
 const tabs = [
   { key: 'login',   label: 'ログイン順' },
   { key: 'newbies', label: '新規登録順' },
   { key: 'roster',  label: '在籍一覧' },
 ]
 const current = ref('login')
-
-const lists = computed(() => ({
-  login: props.login,
-  newbies: props.newbies,
-  roster: props.roster,
-}))
+const lists = computed(() => ({ login: props.login, newbies: props.newbies, roster: props.roster }))
 const displayed = computed(() => lists.value[current.value] ?? [])
 const counts = computed(() => ({
   login:   props.login?.length   ?? 0,
@@ -45,33 +70,20 @@ const isShopOwner = computed(() => {
   const u = page.props?.auth?.user
   return !!(u?.is_shop_owner && u?.shop_id)
 })
-
-/* ====== レール共通：参照とスクロール関数 ====== */
 const railSearch = ref(null)
 const railToday  = ref(null)
 const railTab    = ref(null)
-
 const scrollBy = (elRef, dir = 1) => {
   const el = elRef?.value
   if (!el) return
-  // ビューポート幅の ~90% 分動かすと気持ちよくページング
   const delta = Math.round(el.clientWidth * 0.9) * dir
   el.scrollBy({ left: delta, behavior: 'smooth' })
 }
 const bannerStyle = computed(() => {
   const first = props.text_banners[0] ?? {}
-  return {
-    bg: first.bg_color || '#111111',
-    color: first.text_color || '#FFE08A',
-    speed: first.speed || 60, // px/s想定
-  }
+  return { bg: first.bg_color || '#111111', color: first.text_color || '#FFE08A', speed: first.speed || 60 }
 })
-
-/** アニメ速度（必要なら数値調整してね） */
-const marqueeDuration = computed(() => {
-  // 単純化: speed が速いほど短く。最低8秒。
-  return `${Math.max(8, 2000 / (bannerStyle.value.speed || 60))}s`
-})
+const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.speed || 60))}s`)
 </script>
 
 <template>
@@ -110,31 +122,45 @@ const marqueeDuration = computed(() => {
 </section>
 
 
-<!-- ===== 画像広告（左スライド, 高さ≈120px） ===== -->
+<!-- ===== 画像広告（1枚ずつスライド：軽量） ===== -->
 <section v-if="props.ad_banners.length" class="mb-4">
-  <div class="relative overflow-hidden rounded-md bg-black/30">
-    <!-- ドット or 矢印を後で付けるならここ -->
-    <div class="flex"
+  <div class="relative overflow-hidden rounded-md bg-black/30"
+       @mouseenter="stop" @mouseleave="start">
+
+    <!-- トラック：幅は100%。translateX(-slide*100%) で移動 -->
+    <div class="ad-track"
          :style="{
-           // 画像枚数に応じて往復ではなく“無限左流し”
-           animation: 'slide-left linear infinite',
-           animationDuration: `${Math.max(12, 4 * (props.ad_banners.length || 1))}s`,
-           width: 'max-content',
+           transform: `translateX(-${slide * 100}%)`,
+           transition: transitioning ? `transform ${durationMs}ms ease-out` : 'none',
          }">
-      <!-- 無限ループのために2周分 -->
-      <template v-for="rep in 2" :key="rep">
-        <a v-for="ad in props.ad_banners" :key="`${rep}-${ad.id}`"
-           :href="ad.url || undefined" target="_blank" rel="noopener"
-           class="block shrink-0">
-          <img :src="ad.src"
-               :alt="`ad-${ad.id}`"
-               class="object-contain"
-               :style="{ height: `400px` }">
-        </a>
-      </template>
+      <a v-for="ad in props.ad_banners" :key="ad.id"
+         :href="ad.url || undefined" target="_blank" rel="noopener"
+         class="ad-slide">
+        <img :src="ad.src" :alt="`ad-${ad.id}`"
+             class="object-contain"
+             :style="{ height: `400px` }">
+      </a>
+    </div>
+
+    <!-- 左右ボタン -->
+    <button class="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-10
+                   h-9 w-9 items-center justify-center rounded-full bg-black/40 hover:bg-black/60"
+            @click="prevAd" aria-label="prev">‹</button>
+    <button class="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-10
+                   h-9 w-9 items-center justify-center rounded-full bg-black/40 hover:bg-black/60"
+            @click="nextAd" aria-label="next">›</button>
+
+    <!-- ドット -->
+    <div v-if="props.ad_banners.length > 1"
+         class="absolute bottom-2 left-0 right-0 flex justify-center gap-2 z-10">
+      <button v-for="(ad,i) in props.ad_banners" :key="ad.id"
+              class="h-2.5 w-2.5 rounded-full transition"
+              :class="i === slide ? 'bg-white' : 'bg-white/40 hover:bg-white/70'"
+              @click="go(i)" aria-label="go"></button>
     </div>
   </div>
 </section>
+
 
       <section v-if="props.search_applied" class="mb-8">
         <div class="inline-block px-4 py-1 rounded bg-[#6b4b17] border border-[#d1b05a] text-[18px] tracking-[0.3em]">
@@ -342,5 +368,18 @@ const marqueeDuration = computed(() => {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+/* 軽量スライダー用 */
+.ad-track {
+  display: flex;
+  width: 100%;
+  will-change: transform;
+}
+.ad-slide {
+  flex: 0 0 100%;           /* 1スライド = ビューポート幅 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 </style>
 
