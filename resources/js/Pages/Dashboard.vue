@@ -124,9 +124,10 @@ const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.
 
 <!-- ===== 画像広告（1枚ずつスライド：軽量） ===== -->
 <section v-if="props.ad_banners.length" class="mb-4">
-  <div class="relative overflow-hidden rounded-md bg-black/30 ad-viewport"
+  <div class="relative overflow-hidden rounded-md bg-black/30 h-[400px]"
        @mouseenter="stop" @mouseleave="start">
-    <!-- トラック -->
+
+    <!-- トラック：幅は100%。translateX(-slide*100%) で移動 -->
     <div class="ad-track"
          :style="{
            transform: `translateX(-${slide * 100}%)`,
@@ -135,8 +136,7 @@ const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.
       <a v-for="ad in props.ad_banners" :key="ad.id"
          :href="ad.url || undefined" target="_blank" rel="noopener"
          class="ad-slide">
-        <!-- 高さは枠に合わせて100%固定 -->
-        <img :src="ad.src" :alt="`ad-${ad.id}`" class="ad-img object-contain" />
+<img :src="ad.src" :alt="`ad-${ad.id}`" class="ad-img object-contain" />
       </a>
     </div>
 
@@ -372,11 +372,22 @@ const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.
   width: 100%;
   will-change: transform;
 }
+
+/* 各スライドは“枠の幅100% × 高さ100%” */
 .ad-slide {
-  flex: 0 0 100%;           /* 1スライド = ビューポート幅 */
+  flex: 0 0 100%;
   display: flex;
   justify-content: center;
   align-items: center;
+  height: 100%;           /* ← 高さ埋める */
+}
+
+/* 画像は“高さ優先（縦400pxに合わせる）・はみ出さない” */
+.ad-img {
+  height: 100%;           /* ← これが縦優先のキモ */
+  width: auto;            /* アスペクト比維持 */
+  max-width: 100%;        /* 横にはみ出さない */
+  object-fit: contain;    /* トリミングなし（切りたければ cover に変更） */
 }
 
 </style>
