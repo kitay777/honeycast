@@ -64,4 +64,8 @@ class User extends Authenticatable
     }
 
     public function scopeCasts($q) { return $q->where('is_cast', true); }
+    public function castLikes()
+{
+    return $this->hasMany(\App\Models\CastLike::class);
+}
 }

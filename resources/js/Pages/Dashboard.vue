@@ -212,7 +212,7 @@ const marqueeDuration = computed(() => {
                 :key="c.id"
                 class="shrink-0 snap-start w-[68vw] xs:w-[55vw] sm:w-[240px] md:w-[260px]"
               >
-                <CastCard :cast="c" :liked="true" :online="true" />
+                <CastCard :cast="c" :liked="c.liked" :online="true" />
               </div>
             </div>
           </div>

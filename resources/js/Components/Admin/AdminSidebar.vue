@@ -23,6 +23,11 @@ const props = defineProps({
 
       { key: 'ng', label: 'テロップ', to: '/admin/text-banners' },
       { key: 'ng', label: '広告', to: '/admin/ad-banners' },
+
+
+      { key: 'ng', label: 'イベント', to: '/admin/events' },
+
+      { key: 'ng', label: 'ホテル', to: '/admin/hotels' },
     ]),
   },
 })

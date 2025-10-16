@@ -40,7 +40,36 @@ use App\Http\Controllers\GameController;
 use App\Http\Controllers\Admin\NewsController;
 // routes/web.php
 use App\Http\Controllers\ScheduleController;
+use App\Http\Controllers\Admin\EventController as AdminEventController;
+use App\Http\Controllers\EventController as PublicEventController;
+// routes/web.php
+use App\Http\Controllers\Admin\HotelController as AdminHotelController;
+use App\Http\Controllers\HotelController as PublicHotelController;
+// routes/web.php
+use App\Http\Controllers\CastLikeController;
 
+Route::middleware('auth')->group(function () {
+    Route::post('/casts/{cast}/like',  [CastLikeController::class, 'store'])->name('casts.like');
+    Route::delete('/casts/{cast}/like',[CastLikeController::class, 'destroy'])->name('casts.unlike');
+});
+
+Route::middleware(['auth','can:admin'])
+  ->prefix('admin')->name('admin.')
+  ->group(function () {
+    Route::resource('hotels', AdminHotelController::class);
+  });
+
+Route::get('/hotels', [PublicHotelController::class, 'index'])->name('hotels.index');
+Route::get('/hotels/{hotel}', [PublicHotelController::class, 'show'])->name('hotels.show');
+
+Route::middleware(['auth','can:admin'])
+  ->prefix('admin')->name('admin.')
+  ->group(function () {
+    Route::resource('events', AdminEventController::class);
+  });
+
+// ユーザー向け一覧
+Route::get('/events', [PublicEventController::class, 'index'])->name('events.index');
 Route::get('/schedule', [ScheduleController::class, 'index'])->name('schedule');
 
 Route::middleware(['auth','can:admin'])

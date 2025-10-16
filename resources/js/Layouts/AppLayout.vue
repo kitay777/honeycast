@@ -145,31 +145,72 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
+
+• HOTEL LIST
+• RECRUI
       <!-- メニュー項目 -->
       <nav class="py-2">
         <Link
-          href="/profile"
+          href="/dashboard"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
-        >プロフィール</Link>
+        >TOP</Link>
+        <Link
+          href="/system"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >SYSTEM</Link>
+        <Link
+          href="/tweets"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >ツイート</Link>
+        <Link
+          href="/tweets"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >ツイート</Link>
+        <Link
+          href="/ranking"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >キャスト</Link>
+        <Link
+          href="/schedule"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >スケジュール</Link>
+        <Link
+          href="/newface"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >NEW FACE</Link>
+        <Link
+          href="/events"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >EVENT</Link>
+        <Link
+          href="/staffblog"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >STAFF BLOG</Link>
+        <Link
+          href="/hotels"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >HOTEL LIST</Link>
+        <Link
+          href="/recruit"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >RECRUIT</Link>
 
         <Link
           href="/mypage"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
         >マイページ</Link>
-
-        <Link
-          href="/settings"
-          class="block px-5 py-4 hover:bg-white/10"
-          @click="closeMenu"
-        >設定</Link>
-
-        <Link
-          href="/help"
-          class="block px-5 py-4 hover:bg-white/10"
-          @click="closeMenu"
-        >ヘルプ</Link>
 
         <Link
           href="/logout"
