@@ -124,10 +124,9 @@ const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.
 
 <!-- ===== 画像広告（1枚ずつスライド：軽量） ===== -->
 <section v-if="props.ad_banners.length" class="mb-4">
-  <div class="relative overflow-hidden rounded-md bg-black/30"
+  <div class="relative overflow-hidden rounded-md bg-black/30 ad-viewport"
        @mouseenter="stop" @mouseleave="start">
-
-    <!-- トラック：幅は100%。translateX(-slide*100%) で移動 -->
+    <!-- トラック -->
     <div class="ad-track"
          :style="{
            transform: `translateX(-${slide * 100}%)`,
@@ -136,9 +135,8 @@ const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.
       <a v-for="ad in props.ad_banners" :key="ad.id"
          :href="ad.url || undefined" target="_blank" rel="noopener"
          class="ad-slide">
-        <img :src="ad.src" :alt="`ad-${ad.id}`"
-             class="object-contain"
-             :style="{ height: `400px` }">
+        <!-- 高さは枠に合わせて100%固定 -->
+        <img :src="ad.src" :alt="`ad-${ad.id}`" class="ad-img object-contain" />
       </a>
     </div>
 
