@@ -1,6 +1,7 @@
 <!-- resources/js/Pages/Schedule/Index.vue -->
 <script setup>
 import { Link, router } from '@inertiajs/vue3'
+import AppLayout from '@/Layouts/AppLayout.vue'
 
 const props = defineProps({
   calendar4: { type: Array, default: () => [] }, // [{date,label,items:[]}]
@@ -18,6 +19,8 @@ const go = (delta) => {
 </script>
 
 <template>
+
+  <AppLayout>
   <div class="min-h-dvh bg-[url('/assets/imgs/back.png')] bg-no-repeat bg-center bg-[length:100%_100%] text-white/90">
     <div class="max-w-6xl mx-auto px-4 py-6">
       <!-- ヘッダ -->
@@ -68,4 +71,5 @@ const go = (delta) => {
       </div>
     </div>
   </div>
+  </AppLayout>
 </template>
