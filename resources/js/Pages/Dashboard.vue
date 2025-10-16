@@ -129,7 +129,7 @@ const marqueeDuration = computed(() => {
           <img :src="ad.src"
                :alt="`ad-${ad.id}`"
                class="object-contain"
-               :style="{ height: `${ad.height || 120}px` }">
+               :style="{ height: `400px` }">
         </a>
       </template>
     </div>

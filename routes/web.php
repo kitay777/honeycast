@@ -47,7 +47,9 @@ use App\Http\Controllers\Admin\HotelController as AdminHotelController;
 use App\Http\Controllers\HotelController as PublicHotelController;
 // routes/web.php
 use App\Http\Controllers\CastLikeController;
+use App\Http\Controllers\ContactController;
 
+Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::middleware('auth')->group(function () {
     Route::get('/my/likes', [CastLikeController::class, 'index'])->name('likes.index');
     // 既存の like/unlike ルートはそのまま
