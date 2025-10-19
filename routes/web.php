@@ -50,7 +50,9 @@ use App\Http\Controllers\CastLikeController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\RosterController;
+use App\Http\Controllers\NewbieController;
 
+Route::get('/newbies', [NewbieController::class, 'index'])->name('newbies.index');
 Route::get('/roster', [RosterController::class, 'index'])->name('roster.index');
 Route::get('/shifts', [ShiftController::class, 'index'])->name('shifts.index');
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');

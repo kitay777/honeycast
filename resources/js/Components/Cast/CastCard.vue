@@ -87,7 +87,7 @@ const photoUrl = computed(() =>
       <div class="rounded-md bg-white p-2">
         <div class="relative aspect-[3/4] overflow-hidden rounded-sm">
           <!-- 遷移リンクは画像全体を包む -->
-          <Link :href="`/casts/${cast.id}`" class="absolute inset-0" aria-label="詳細を見る" />
+          <Link :href="`/casts/${cast.id}`" class="absolute inset-0 z-10" aria-label="詳細を見る" />
 
           <img
             :src="photoUrl"
@@ -103,7 +103,7 @@ const photoUrl = computed(() =>
             @click.stop.prevent="toggleLike"
             :disabled="posting"
             class="absolute top-1 right-1 h-9 w-9 rounded-full flex items-center justify-center
-                   border border-white/30 shadow bg-black/40 hover:bg-black/60 transition"
+                   border border-white/30 shadow bg-black/40 hover:bg-black/60 transition  z-20"
             :aria-pressed="localLiked"
             title="いいね"
           >

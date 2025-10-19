@@ -178,7 +178,7 @@ onBeforeUnmount(() => {
           @click="closeMenu"
         >スケジュール</Link>
         <Link
-          href="/ranking"
+          href="/newbies"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
         >NEW FACE</Link>
