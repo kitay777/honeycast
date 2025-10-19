@@ -173,7 +173,7 @@ onBeforeUnmount(() => {
           @click="closeMenu"
         >キャスト</Link>
         <Link
-          href="/schedule"
+          href="/shifts"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
         >スケジュール</Link>
