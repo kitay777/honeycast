@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
         />
       </Link>
 
-      <Link href="/schedule" class="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 border border-white/20 hover:bg-white/20">
+      <Link href="/shifts" class="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 border border-white/20 hover:bg-white/20">
 
         <img
           :src="page.url === '/likes'
@@ -145,9 +145,6 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-
-• HOTEL LIST
-• RECRUI
       <!-- メニュー項目 -->
       <nav class="py-2">
         <Link
