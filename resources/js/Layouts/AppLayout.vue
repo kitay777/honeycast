@@ -39,13 +39,13 @@ onBeforeUnmount(() => {
         />
       </Link>
 
-      <Link href="/ranking" class="flex flex-col items-center">
+      <Link href="/roster" class="flex flex-col items-center">
         <img
-          :src="page.url === '/ranking'
+          :src="page.url === '/roster'
             ? '/assets/icons/caston.png'
             : '/assets/icons/cast.png'"
           class="h-12 mb-1"
-          alt="Ranking"
+          alt="Roster"
         />
       </Link>
 
