@@ -48,7 +48,9 @@ use App\Http\Controllers\HotelController as PublicHotelController;
 // routes/web.php
 use App\Http\Controllers\CastLikeController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ShiftController;
 
+Route::get('/shifts', [ShiftController::class, 'index'])->name('shifts.index');
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::middleware('auth')->group(function () {
     Route::get('/my/likes', [CastLikeController::class, 'index'])->name('likes.index');
