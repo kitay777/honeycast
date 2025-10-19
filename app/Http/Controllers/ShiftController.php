@@ -25,6 +25,7 @@ class ShiftController extends Controller
                 'date'  => $d->toDateString(),
                 'label' => $d->isoFormat('MM/DD（dd）'),
                 'is_today' => $d->isToday(),
+                
             ];
         })->values();
 
@@ -74,6 +75,7 @@ class ShiftController extends Controller
             'selected_date' => $date->toDateString(),
             'days'          => $days,
             'items'         => $items,
+            'today'         => \Illuminate\Support\Carbon::today($tz)->toDateString(),
         ]);
     }
 }

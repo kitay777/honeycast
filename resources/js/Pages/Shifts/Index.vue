@@ -7,6 +7,7 @@ const props = defineProps({
   selected_date: { type: String, required: true },       // 'YYYY-MM-DD'
   days:          { type: Array,  default: () => [] },    // [{date,label,is_today}]
   items:         { type: Array,  default: () => [] },    // [{id, nickname, photo_path, time_text, ...}]
+  today:         { type: String, default: '' },          // 'YYYY-MM-DD'
 })
 
 // 日付タブクリック
@@ -30,21 +31,38 @@ const goDate = (d) => {
         <input placeholder="検索条件を設定する" class="w-full px-3 py-2 rounded bg-white/10 border border-white/20 placeholder-white/50"/>
       </div>
 
-      <!-- 日付チップ（横スクロール） -->
-      <div class="flex gap-2 overflow-x-auto no-scrollbar mb-4">
-        <button
-          v-for="d in props.days"
-          :key="d.date"
-          @click="goDate(d.date)"
-          class="px-4 py-2 rounded-lg border text-sm whitespace-nowrap transition"
-          :class="[
-            d.date === props.selected_date ? 'bg-white text-black border-white' : 'bg-white/5 text-white border-white/20 hover:bg-white/10',
-            d.is_today && d.date !== props.selected_date ? 'ring-1 ring-sky-400' : ''
-          ]"
-        >
-          {{ d.label }}
-        </button>
-      </div>
+  <div class="flex items-center gap-2 mb-4">
+    <!-- ← 今日へ（選択日が今日でないときだけ表示） -->
+    <button
+      v-if="props.today && props.selected_date !== props.today"
+      @click="goDate(props.today)"
+      class="shrink-0 px-2 py-1 rounded-full border text-xs
+            bg-white/10 text-white hover:bg-white/20 border-white/30"
+      aria-label="今日へ戻る"
+      title="今日へ戻る"
+    >
+      ← 今日
+    </button>
+
+    <!-- 横スクロールな日付チップ -->
+    <div class="flex gap-2 overflow-x-auto no-scrollbar">
+      <button
+        v-for="d in props.days"
+        :key="d.date"
+        @click="goDate(d.date)"
+        class="px-4 py-2 rounded-lg border text-sm whitespace-nowrap transition"
+        :class="[
+          d.date === props.selected_date
+            ? 'bg-white text-black border-white'
+            : 'bg-white/5 text-white border-white/20 hover:bg-white/10',
+          d.is_today && d.date !== props.selected_date ? 'ring-1 ring-sky-400' : ''
+        ]"
+      >
+        {{ d.label }}
+      </button>
+    </div>
+  </div>
+      
 
       <!-- 時間帯ラベル（任意、ここでは選択日の最小-最大時間をざっくり表示） -->
       <div v-if="props.items.length" class="mb-2 text-right text-white/70 text-sm">
