@@ -22,7 +22,7 @@ const props = defineProps({
       { key: 'inquiries', label: 'お問い合わせ', to: '/admin/inquiries' },
       { key: 'settings', label: '各種設定', to: '/admin/settings' },
       { key: 'ng', label: '禁止ワード', to: '/admin/ng-words' },
-
+      { key: 'gifts', label: 'ギフト', to: '/admin/gifts' },
       { key: 'ng', label: 'テロップ', to: '/admin/text-banners' },
       { key: 'ng', label: '広告', to: '/admin/ad-banners' },
 
