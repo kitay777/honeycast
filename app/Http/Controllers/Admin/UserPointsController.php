@@ -71,35 +71,34 @@ class UserPointsController extends Controller
         ]);
     }
 
-    public function adjustUser(Request $r, User $user)
-    {
-        $data = $r->validate([
-            'delta'  => ['required','integer','between:-100000000,100000000'],
-            'reason' => ['nullable','string','max:255'],
+public function adjustUser(Request $r, User $user)
+{
+    $data = $r->validate([
+        'delta'  => ['required','integer','between:-100000000,100000000'],
+        'reason' => ['nullable','string','max:255'],
+    ]);
+
+    $actorId = $r->user()->id;
+
+    DB::transaction(function () use ($user, $data, $actorId) {
+        $u = User::whereKey($user->id)->lockForUpdate()->first();
+        $new = $u->points + (int)$data['delta'];
+        if ($new < 0) {
+            throw new \RuntimeException('残高がマイナスになります');
+        }
+        $u->points = $new; $u->save();
+
+        PointsEntry::create([
+            'user_id'       => $u->id,
+            'delta'         => (int)$data['delta'],
+            'balance_after' => $new,
+            'reason'        => $data['reason'] ?? null,
+            'acted_by'      => $actorId,
         ]);
+    });
 
-        $actorId = $r->user()->id;  // ★ ここで取得（無名関数の外で）
-
-        DB::transaction(function () use ($user, $data, $actorId) {  // ★ 渡す
-            // 残高更新（ロック）
-            $u = User::whereKey($user->id)->lockForUpdate()->first();
-            $new = $u->points + (int)$data['delta'];
-            if ($new < 0) {
-                throw new \RuntimeException('残高がマイナスになります');
-            }
-            $u->points = $new;
-            $u->save();
-
-            // 台帳
-            PointsEntry::create([
-                'user_id'       => $u->id,
-                'delta'         => (int)$data['delta'],
-                'balance_after' => $new,
-                'reason'        => $data['reason'] ?? null,
-                'acted_by'      => $actorId,      // ★ ここで使用
-            ]);
-        });
-
-        return response()->json(['ok' => true]);
-    }
+    // ★ Inertiaに正しいレスポンス（303 See Other）を返す
+    //    -> 同一画面に戻って props を再取得
+    return back(303)->with('success', 'ポイントを調整しました');
+}
 }
