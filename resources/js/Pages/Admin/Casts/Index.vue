@@ -1,9 +1,9 @@
 <script setup>
 import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import AdminLayout from '@/Layouts/AdminLayout.vue' // @ が無ければ相対パスに
+import AdminLayout from '@/Layouts/AdminLayout.vue'
 
-/** route() が無い/解決失敗でもフォールバック */
+/** route() フォールバック */
 const urlFor = (name, params = {}, fallback = "") => {
   try { if (typeof route === "function") { const u = route(name, params); if (typeof u === "string" && u.length) return u } } catch {}
   return fallback
@@ -17,7 +17,7 @@ const props = defineProps({
 const page  = usePage()
 const flash = computed(() => page.props?.value?.flash ?? {})
 
-/* データ（未定義ガード） */
+/* 一覧・ページネーション */
 const castsData  = computed(() => props.casts?.data  ?? [])
 const castsLinks = computed(() => props.casts?.links ?? [])
 
@@ -27,7 +27,7 @@ function search() {
   router.get('/admin/casts', { q: q.value }, { preserveState: true, replace: true })
 }
 
-/* 上下スプリット（ドラッグ） */
+/* 上下スプリット（従来のマウスイベント版：必要なら Pointer 版に差替OK） */
 const topPct = ref(parseInt(localStorage.getItem('admin_casts_split') || '55', 10))
 let dragging = false
 function startDrag(e){ dragging = true; document.body.style.cursor='row-resize'; e.preventDefault() }
@@ -48,11 +48,11 @@ function endDrag(){
 onMounted(()=>{ window.addEventListener('mousemove', onDrag); window.addEventListener('mouseup', endDrag); window.addEventListener('mouseleave', endDrag) })
 onBeforeUnmount(()=>{ window.removeEventListener('mousemove', onDrag); window.removeEventListener('mouseup', endDrag); window.removeEventListener('mouseleave', endDrag) })
 
-/* フォーム（実スキーマ対応） */
+/* 選択＆編集フォーム */
 const selectedId = ref(null)
 const form = useForm({
   id: null,
-  // User（新規時の firstOrCreate 用）
+  // User（新規時 firstOrCreate 用）
   name: '', email: '',
   // CastProfile
   nickname: '', rank: '', age: null, height_cm: null,
@@ -62,7 +62,7 @@ const form = useForm({
 })
 const title = computed(() => form.id ? 'キャスト編集' : '新規キャスト')
 
-function resetForm(){ form.reset(); form.clearErrors(); form.id=null; selectedId.value=null }
+function resetForm(){ form.reset(); form.clearErrors(); form.id=null; selectedId.value=null; resetPointsPanel() }
 function selectForEdit(c){
   selectedId.value = c.id
   form.id = c.id
@@ -80,29 +80,24 @@ function selectForEdit(c){
   form.tags      = c.tags ?? ''
   form.freeword  = c.freeword ?? ''
   form.photo     = null
+
+  // ★ 紐づくユーザーのポイント読込
+  const uid = c?.user?.id
+  loadPoints(uid)
 }
-function submitCreate(){
-  form.post('/admin/casts', { forceFormData:true, onSuccess: () => resetForm() })
-}
-function submitUpdate(){
-  form.post(`/admin/casts/${form.id}`, { method:'put', forceFormData:true })
-}
-function remove(c){
-  if(!confirm('削除しますか？')) return
+function submitCreate(){ form.post('/admin/casts', { forceFormData:true, onSuccess: () => resetForm() }) }
+function submitUpdate(){ form.post(`/admin/casts/${form.id}`, { method:'put', forceFormData:true }) }
+function remove(c){ if(!confirm('削除しますか？')) return
   router.delete(`/admin/casts/${c.id}`, { onSuccess: ()=> { if(selectedId.value===c.id) resetForm() } })
 }
 
 /* ───────── LINE 送信（キャストの紐づくユーザーへ） ───────── */
 const lineForm = useForm({ text:'', notification_disabled:false })
 const sendingLine = ref(false)
-
-/** キャスト行の「LINE送信」→ 下パネルへスクロール＆選択 */
 function openLineAndScroll(c){
   selectForEdit(c)
   setTimeout(()=>{ document.getElementById('line-send-box')?.scrollIntoView({ behavior:'smooth', block:'start' }) }, 0)
 }
-
-/** 送信：/admin/users/{user}/line/push へPOST（AdminLineController@push） */
 async function sendLine(castUserId) {
   if (!castUserId || !lineForm.text) return
   if (sendingLine.value) return
@@ -112,6 +107,48 @@ async function sendLine(castUserId) {
     preserveScroll: true,
     onFinish: () => { sendingLine.value = false },
     onSuccess: () => { lineForm.reset('text') },
+  })
+}
+
+/* ───────── ポイント（紐づくユーザー：残高＋履歴＋調整） ───────── */
+const loadingPoints = ref(false)
+const points = ref({ balance: 0, history: [] })
+const pointsForm = useForm({ delta: 0, reason: '' })
+const pointsError = ref('')
+const currentUserId = ref(null) // 紐づくユーザーID（選択キャストの）
+
+function resetPointsPanel(){
+  points.value = { balance: 0, history: [] }
+  pointsForm.reset('delta', 'reason')
+  pointsError.value = ''
+  loadingPoints.value = false
+  currentUserId.value = null
+}
+
+async function loadPoints(userId){
+  resetPointsPanel()
+  if (!userId) return
+  currentUserId.value = userId
+  loadingPoints.value = true
+  try {
+    const res = await fetch(`/admin/users/${userId}/points`, { headers: { 'Accept':'application/json' } })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    points.value = await res.json()
+  } catch(e){
+    pointsError.value = '履歴の読み込みに失敗しました。'
+    console.error(e)
+  } finally {
+    loadingPoints.value = false
+  }
+}
+
+async function submitPoints(){
+  if (!currentUserId.value) return
+  pointsError.value = ''
+  await pointsForm.post(`/admin/users/${currentUserId.value}/points/adjust`, {
+    preserveScroll: true,
+    onSuccess: () => { pointsForm.reset('delta','reason'); loadPoints(currentUserId.value) },
+    onError: (errs) => { pointsError.value = errs?.delta || errs?.reason || '調整に失敗しました。' },
   })
 }
 </script>
@@ -183,7 +220,7 @@ async function sendLine(castUserId) {
     <!-- 仕切り -->
     <div class="h-2 bg-gray-200 hover:bg-gray-300 cursor-row-resize" @mousedown="startDrag"></div>
 
-    <!-- 下：編集フォーム + LINE送信 -->
+    <!-- 下：編集フォーム + LINE送信 + ポイント -->
     <div class="p-4 overflow-auto" :style="{ height: `calc(${100 - topPct}% - 2px)` }">
       <div class="bg-white rounded-2xl shadow p-4">
         <h2 class="text-lg font-semibold mb-3">{{ title }}</h2>
@@ -262,11 +299,69 @@ async function sendLine(castUserId) {
         </form>
       </div>
 
+      <!-- ───────── ポイント（紐づくユーザー：残高＋履歴＋調整） ───────── -->
+      <div class="bg-white rounded-2xl shadow p-4 mt-4">
+        <h3 class="text-lg font-semibold mb-2">ポイント（紐づくユーザー）</h3>
+
+        <div v-if="!castsData.find(v => v.id === selectedId)?.user?.id" class="text-sm text-gray-500">
+          紐づくユーザーがありません。上の一覧からキャストを選択してください。
+        </div>
+
+        <template v-else>
+          <div class="flex flex-wrap items-end gap-4">
+            <div class="text-sm">
+              残高：
+              <span class="text-2xl font-bold">
+                {{ loadingPoints ? '…' : (points.balance || 0).toLocaleString() }}
+              </span> pt
+            </div>
+
+            <form @submit.prevent="submitPoints" class="flex items-end gap-2">
+              <div>
+                <label class="text-sm">増減（例 +100 / -50）</label>
+                <input v-model.number="pointsForm.delta" type="number" class="border rounded px-3 py-2 w-28" />
+              </div>
+              <div>
+                <label class="text-sm">理由（任意）</label>
+                <input v-model="pointsForm.reason" type="text" class="border rounded px-3 py-2 w-64" />
+              </div>
+              <button :disabled="pointsForm.processing || !castsData.find(v => v.id === selectedId)?.user?.id"
+                      class="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-60">
+                反映
+              </button>
+            </form>
+          </div>
+
+          <div class="mt-2 text-xs text-red-600" v-if="pointsError">{{ pointsError }}</div>
+
+          <div class="mt-3">
+            <div class="text-sm font-semibold mb-1">履歴（最新20件）</div>
+            <div v-if="loadingPoints" class="text-gray-500 text-sm">読み込み中…</div>
+            <div v-else-if="!points.history.length" class="text-gray-500 text-sm">履歴はまだありません。</div>
+            <ul v-else class="divide-y">
+              <li v-for="h in points.history" :key="h.id" class="py-2 flex items-center justify-between text-sm">
+                <div :class="h.delta >= 0 ? 'text-emerald-600' : 'text-rose-600'">
+                  {{ h.delta >= 0 ? '+' : '' }}{{ h.delta }} pt
+                  <span class="text-gray-500 ml-2">{{ h.reason || '—' }}</span>
+                </div>
+                <div class="text-right text-gray-500">
+                  <div>{{ h.created_at }}</div>
+                  <div class="text-xs">残高: {{ h.after }}</div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </template>
+      </div>
+
       <!-- ───────── LINEメッセージ送信 ───────── -->
       <div id="line-send-box" class="bg-white rounded-2xl shadow p-4 mt-4">
         <h3 class="text-lg font-semibold mb-2">LINE メッセージ送信</h3>
         <div class="text-sm text-gray-600 mb-2">
-          送信先ユーザーID: <span class="font-medium">{{ form.id ? '(キャストに紐づくユーザー)' : '-' }}</span>
+          送信先ユーザーID:
+          <span class="font-medium">
+            {{ castsData.find(v => v.id === selectedId)?.user?.id ?? '-' }}
+          </span>
           <span class="ml-2 text-gray-500">(上の一覧からキャストを選択してから送信)</span>
         </div>
         <div class="space-y-2">
@@ -280,7 +375,6 @@ async function sendLine(castUserId) {
           </label>
 
           <div class="mt-1 flex items-center gap-2">
-            <!-- castsData から選択済みキャストの user.id を引く -->
             <button
               type="button"
               @click="sendLine(castsData.find(v => v.id === selectedId)?.user?.id)"

@@ -51,6 +51,55 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\RosterController;
 use App\Http\Controllers\NewbieController;
+// routes/web.php
+use App\Http\Controllers\MyPageController;
+use App\Http\Controllers\Admin\UserPointsController;
+
+use App\Http\Controllers\Admin\GiftController as AdminGiftController;
+use App\Http\Controllers\GiftSendController;
+
+Route::middleware(['auth','verified'])->group(function () {
+    // 送った（ユーザー視点）
+    Route::get('/my/gifts',   [GiftSendController::class, 'mySends'])->name('gifts.my');
+    // もらった（キャスト本人視点 = ログイン済みユーザーに cast_profile が紐づく想定）
+    Route::get('/cast/gifts', [GiftSendController::class, 'castReceives'])->name('gifts.cast');
+});
+
+Route::middleware(['auth','verified'])->group(function () {
+    Route::post('/gifts/send', [GiftSendController::class, 'store'])->name('gifts.send');
+    Route::get('/my/gifts',    [GiftSendController::class, 'mySends'])->name('gifts.my');
+    Route::get('/cast/gifts',  [GiftSendController::class, 'castReceives'])->name('gifts.cast'); // キャスト本人
+});
+Route::middleware(['auth','verified','can:admin'])
+    ->prefix('admin')->name('admin.')
+    ->group(function () {
+        Route::resource('gifts', AdminGiftController::class);
+    });
+
+Route::middleware(['auth','verified','can:admin'])
+    ->prefix('admin')->name('admin.')->group(function () {
+    // 既存:
+    Route::get ('/points',        [UserPointsController::class, 'index'])->name('points.index');
+    Route::post('/points/adjust', [UserPointsController::class, 'adjust'])->name('points.adjust');
+
+    // ★ 追加: 個別ユーザーのポイント履歴をJSONで返す
+    Route::get('/users/{user}/points', [UserPointsController::class, 'show'])
+        ->name('points.show'); // JSON
+
+    // ★ 追加: 個別ユーザーのポイント調整（user_id パス版）
+    Route::post('/users/{user}/points/adjust', [UserPointsController::class, 'adjustUser'])
+        ->name('points.adjustUser');
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/mypage/points', [MyPageController::class, 'points'])->name('mypage.points');
+});
+
+Route::middleware(['auth','verified','can:admin'])
+    ->prefix('admin')->name('admin.')->group(function () {
+        Route::get ('/points',         [UserPointsController::class, 'index'])->name('points.index');
+        Route::post('/points/adjust',  [UserPointsController::class, 'adjust'])->name('points.adjust');
+    });
 
 Route::get('/newbies', [NewbieController::class, 'index'])->name('newbies.index');
 Route::get('/roster', [RosterController::class, 'index'])->name('roster.index');

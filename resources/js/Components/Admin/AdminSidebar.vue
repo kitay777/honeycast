@@ -9,6 +9,8 @@ const props = defineProps({
     default: () => ([
       { key: 'users', label: 'キャスト管理', to: '/admin/users' },
       { key: 'casts', label: 'ユーザー管理', to: '/admin/casts' },
+      
+      { key: 'points', label: 'ポイント管理', to: '/admin/points' },
       { key: 'requests',   label: 'リクエスト',   to: '/admin/requests' },
       { key: 'schedules', label: 'スケジュール', to: '/admin/schedules' },
       { key: 'shops', label: 'ショップ管理', to: '/admin/shops' },

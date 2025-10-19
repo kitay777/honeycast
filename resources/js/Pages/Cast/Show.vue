@@ -1,7 +1,7 @@
 <!-- resources/js/Pages/Cast/Show.vue -->
 <script setup>
 import { computed, ref, watch } from "vue"
-import { router, Link } from "@inertiajs/vue3"
+import { router, Link, useForm } from "@inertiajs/vue3"
 import AppLayout from "@/Layouts/AppLayout.vue"
 
 /** route() が無くても動くフォールバック */
@@ -20,11 +20,15 @@ const props = defineProps({
   cast: { type: Object, required: true },
   schedule: { type: Array, default: () => [] },
   unblur: { type: Object, default: () => ({ requested:false, status:null }) },
+
+  // ★ ギフト送付用（サーバで渡す）
+  gifts: { type: Array, default: () => [] },         // [{id,name,image_url,present_points,cast_points}, ...]
+  my_balance: { type: Number, default: 0 },           // ログインユーザー残高
+  last_gift_id: { type: Number, default: null },      // 相手への直近ギフトID（連投防止用）
 })
 
 /* ====== 写真 ====== */
 const gallery = computed(() => Array.isArray(props.cast?.photos) ? props.cast.photos : [])
-
 const photoPathUrl = computed(() =>
   props.cast?.photo_path ? `/storage/${props.cast.photo_path}` : null
 )
@@ -91,7 +95,7 @@ const requestUnblurPhoto = (photoId) => {
   })
 }
 
-/* ====== チャット開始 ====== */
+/* ====== チャット開始（既存CTA用） ====== */
 const startingChat = ref(false)
 const startChat = () => {
   if (startingChat.value) return
@@ -103,6 +107,47 @@ const startChat = () => {
   )
 }
 const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
+
+/* ====== ギフト送付（1件選択） ====== */
+const showGift = ref(false)
+const sendForm = useForm({ cast_id: props.cast.id, gift_id: null, message: '' })
+const gi = ref(0) // index
+const curGift = computed(() => props.gifts?.[gi.value] ?? null)
+
+const canSend = (g) => {
+  if (!g) return false
+  if (props.my_balance < g.present_points) return false
+  if (props.last_gift_id && props.last_gift_id === g.id) return false // 直前同一は不可
+  return true
+}
+const sendingGift = ref(false)
+const giftError = ref('')
+const giftToast = ref('') // 成功トースト
+
+function send(g) {
+  if (!canSend(g) || sendingGift.value) return
+  sendingGift.value = true
+  giftError.value = ''
+  sendForm.cast_id = props.cast.id
+  sendForm.gift_id = g.id
+  sendForm.post('/gifts/send', {
+    preserveScroll: true,
+    onFinish: () => { sendingGift.value = false },
+    onSuccess: () => {
+      // UI反応：閉じる + メッセージクリア + トースト + 残高/直近ギフト再取得
+      showGift.value = false
+      sendForm.reset('message')
+      giftToast.value = '🎁 贈りました'
+      setTimeout(() => (giftToast.value = ''), 2500)
+      router.reload({ only: ['my_balance','last_gift_id'] })
+    },
+    onError: (errs) => {
+      giftError.value = errs?.gift || '送信に失敗しました。'
+    },
+  })
+}
+function nextGift(){ if (!props.gifts?.length) return; gi.value = (gi.value + 1) % props.gifts.length }
+function prevGift(){ if (!props.gifts?.length) return; gi.value = (gi.value - 1 + props.gifts.length) % props.gifts.length }
 </script>
 
 <template>
@@ -121,7 +166,7 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
           <img src="/assets/icons/like-badge.png" class="h-8" alt="like"/>
         </div>
 
-        <!-- メイン写真：原寸優先／はみ出す時だけ縮小（縦は --maxh 上限） -->
+        <!-- メイン写真 -->
         <div
           class="mt-2 relative bg-white rounded overflow-hidden ring-1 ring-black/10 flex items-center justify-center"
           style="--maxh: 52vh;"
@@ -140,7 +185,7 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
           </div>
         </div>
 
-        <!-- サムネ（横スクロール）：非クロップ（レターボックス可） -->
+        <!-- サムネ（横スクロール） -->
         <div v-if="gallery.length" class="mt-3 relative">
           <div class="flex gap-3 overflow-x-auto no-scrollbar -mx-2 px-2 py-1">
             <div
@@ -154,8 +199,7 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
                 :class="photoShouldBlur(p) ? 'blur-md scale-[1.03]' : ''"
                 alt=""
               />
-
-              <!-- 個別申請ボタン（ぼかし中・未申請の時だけ） -->
+              <!-- 個別申請 -->
               <div v-if="photoShouldBlur(p) && !(p.unblur?.requested)"
                    class="absolute inset-0 flex items-center justify-center bg-black/35 z-10">
                 <button
@@ -182,28 +226,10 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
           <div class="text-[#ffcc66]">★ ★ ★ ★ ☆</div>
 
           <div class="flex items-center gap-3">
-            <!-- プロファイル単位のぼかし解除申請（必要なら有効化）
-            <button
-              v-if="!hasProfileAccess && !hasUnblurRequest"
-              @click="requestUnblurProfile"
-              :disabled="requesting"
-              class="px-4 py-2 rounded bg-[#ffe7b3] text-black shadow disabled:opacity-60 disabled:pointer-events-none">
-              ぼかしを外す申請
+            <!-- ★ ギフトモーダルを開く -->
+            <button @click="(gi = 0, showGift = true)" class="px-4 py-2 rounded bg-pink-600 text-white shadow">
+              🎁 ギフトを贈る
             </button>
-            <span v-else-if="!hasProfileAccess && hasUnblurRequest"
-                  class="px-4 py-2 rounded bg-[#bfb6a3] text-black/90 shadow text-sm">
-              申請済み<span v-if="unblurStatus">（{{ unblurStatus }}）</span>
-            </span>
-            -->
-
-            <Link
-              as="button"
-              method="post"
-              :href="urlFor('casts.startChat', props.cast.id, `/casts/${props.cast.id}/start-chat`)"
-              class="px-4 py-2 rounded bg-[#e7d7a0] text-black shadow"
-            >
-              ギフトを贈る
-            </Link>
           </div>
         </div>
       </section>
@@ -283,6 +309,80 @@ const startChatHref = computed(() => `/casts/${props.cast.id}/start-chat`)
         指名する
       </Link>
     </div>
+
+    <!-- 🎁 ギフトモーダル -->
+    <div v-if="showGift" class="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-3">
+      <div class="bg-white rounded-2xl p-4 w-[min(760px,95vw)] max-h-[90vh] overflow-auto text-gray-800">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold">ギフトを贈る</h3>
+          <button class="text-gray-500" @click="showGift=false">×</button>
+        </div>
+
+        <div class="mt-1 text-sm">
+          残高：<span class="font-bold">{{ (props.my_balance||0).toLocaleString() }}</span> pt
+        </div>
+
+        <!-- 1件だけ表示 + 左右ナビ + ドット -->
+        <div class="mt-3">
+          <div class="flex items-center justify-between">
+            <button class="px-2 py-1 rounded border text-sm" @click="prevGift" :disabled="!props.gifts?.length">＜</button>
+            <div class="text-sm">残高：<b>{{ (props.my_balance||0).toLocaleString() }}</b> pt</div>
+            <button class="px-2 py-1 rounded border text-sm" @click="nextGift" :disabled="!props.gifts?.length">＞</button>
+          </div>
+
+          <div v-if="curGift" class="mt-3 p-3 rounded border">
+            <div class="flex gap-3">
+              <img :src="curGift.image_url" class="h-20 w-24 object-contain bg-gray-50 rounded" />
+              <div class="flex-1">
+                <div class="font-semibold text-lg">{{ curGift.name }}</div>
+                <div class="text-xs text-gray-600 mt-1">
+                  🧧 {{ curGift.present_points.toLocaleString() }} → 🎁 {{ curGift.cast_points.toLocaleString() }}
+                </div>
+                <div v-if="props.last_gift_id===curGift.id" class="text-[11px] text-rose-600 mt-1">
+                  直前と同じギフトは続けて送れません
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 flex gap-2">
+              <input v-model="sendForm.message" placeholder="メッセージ（任意）"
+                     class="flex-1 px-2 py-1 border rounded text-sm text-black placeholder-gray-400" />
+              <button class="px-4 py-2 rounded text-white"
+                      :class="canSend(curGift)?'bg-pink-600 hover:brightness-110':'bg-gray-400'"
+                      :disabled="!canSend(curGift) || sendingGift"
+                      @click="send(curGift)">
+                <span v-if="!sendingGift">送る</span>
+                <span v-else class="opacity-80">送信中…</span>
+              </button>
+            </div>
+
+            <div v-if="giftError" class="mt-2 text-xs text-rose-600">
+              {{ giftError }}
+            </div>
+          </div>
+
+          <!-- ドットインジケータ -->
+          <div class="mt-3 flex justify-center gap-2">
+            <button v-for="(g,i) in props.gifts" :key="g.id"
+                    class="h-2.5 w-2.5 rounded-full transition"
+                    :class="i===gi ? 'bg-gray-800' : 'bg-gray-300 hover:bg-gray-400'"
+                    @click="gi = i"
+                    :aria-label="g.name"></button>
+          </div>
+        </div>
+
+        <div class="mt-3 text-xs text-gray-500">
+          ※ プレゼントポイントが不足している場合は送付できません。  
+          ※ 同じ相手に同じギフトを<strong>連続で</strong>送ることはできません。
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ 送信成功トースト -->
+    <div v-if="giftToast"
+         class="fixed z-[90] right-4 bottom-5 bg-black/80 text-white text-sm px-3 py-2 rounded shadow">
+      {{ giftToast }}
+    </div>
   </AppLayout>
 </template>
 
@@ -301,3 +401,19 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+/* 画像は“原寸優先”。縦が --maxh を超える時のみ縮小 */
+.img-natural-fit {
+  max-height: var(--maxh, 52vh);
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+.img-no-crop {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+</style>

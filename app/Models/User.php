@@ -49,8 +49,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'shop_id'  => 'integer',
-            'is_admin'=>'boolean',
-            'is_shop_owner'=>'boolean',
+            'is_admin' => 'boolean',
+            'is_shop_owner' => 'boolean',
             'is_cast' => 'boolean',
         ];
     }
@@ -63,9 +63,16 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\Shop::class);
     }
 
-    public function scopeCasts($q) { return $q->where('is_cast', true); }
+    public function scopeCasts($q)
+    {
+        return $q->where('is_cast', true);
+    }
     public function castLikes()
-{
-    return $this->hasMany(\App\Models\CastLike::class);
-}
+    {
+        return $this->hasMany(\App\Models\CastLike::class);
+    }
+    public function pointsEntries()
+    {
+        return $this->hasMany(\App\Models\PointsEntry::class);
+    }
 }

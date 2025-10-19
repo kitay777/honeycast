@@ -210,6 +210,21 @@ onBeforeUnmount(() => {
         >マイページ</Link>
 
         <Link
+          href="/mypage/points"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >ポイント</Link>
+        <Link
+          href="/my/gifts"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >送ったギフト</Link>
+                <Link
+          href="/cast/gifts"
+          class="block px-5 py-4 hover:bg-white/10"
+          @click="closeMenu"
+        >貰ったギフト</Link>
+        <Link
           href="/logout"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
