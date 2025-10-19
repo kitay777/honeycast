@@ -71,30 +71,35 @@ class UserPointsController extends Controller
         ]);
     }
 
-    public function adjustUser(Request $r, \App\Models\User $user)
+    public function adjustUser(Request $r, User $user)
     {
         $data = $r->validate([
-            'delta'  => ['required', 'integer', 'between:-100000000,100000000'],
-            'reason' => ['nullable', 'string', 'max:255'],
+            'delta'  => ['required','integer','between:-100000000,100000000'],
+            'reason' => ['nullable','string','max:255'],
         ]);
 
-        \DB::transaction(function () use ($user, $data) {
-            $u = \App\Models\User::whereKey($user->id)->lockForUpdate()->first();
+        $actorId = $r->user()->id;  // ★ ここで取得（無名関数の外で）
+
+        DB::transaction(function () use ($user, $data, $actorId) {  // ★ 渡す
+            // 残高更新（ロック）
+            $u = User::whereKey($user->id)->lockForUpdate()->first();
             $new = $u->points + (int)$data['delta'];
-            if ($new < 0) throw new \RuntimeException('残高がマイナスになります');
+            if ($new < 0) {
+                throw new \RuntimeException('残高がマイナスになります');
+            }
             $u->points = $new;
             $u->save();
 
-            \App\Models\PointsEntry::create([
+            // 台帳
+            PointsEntry::create([
                 'user_id'       => $u->id,
                 'delta'         => (int)$data['delta'],
                 'balance_after' => $new,
                 'reason'        => $data['reason'] ?? null,
-                'acted_by'      => $r->user()->id,
+                'acted_by'      => $actorId,      // ★ ここで使用
             ]);
         });
 
-        // Inertia画面からのPOSTでも使うので、JSONで返す
         return response()->json(['ok' => true]);
     }
 }
