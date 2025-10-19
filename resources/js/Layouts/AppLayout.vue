@@ -168,7 +168,7 @@ onBeforeUnmount(() => {
           @click="closeMenu"
         >いいね</Link>
         <Link
-          href="/ranking"
+          href="/roster"
           class="block px-5 py-4 hover:bg-white/10"
           @click="closeMenu"
         >キャスト</Link>
