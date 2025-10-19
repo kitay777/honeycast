@@ -26,7 +26,11 @@ const durationMs  = 500  // アニメ時間
 let timer = null
 
 const adCount = computed(() => props.ad_banners.length)
-
+const visibleTextBanners = computed(() =>
+  (props.text_banners ?? []).filter(tb =>
+    tb && tb.is_active !== false && String(tb.message ?? '').trim().length > 0
+  )
+)
 const go = (idx) => {
   if (!adCount.value) return
   const next = (idx + adCount.value) % adCount.value
@@ -80,10 +84,16 @@ const scrollBy = (elRef, dir = 1) => {
   el.scrollBy({ left: delta, behavior: 'smooth' })
 }
 const bannerStyle = computed(() => {
-  const first = props.text_banners[0] ?? {}
-  return { bg: first.bg_color || '#111111', color: first.text_color || '#FFE08A', speed: first.speed || 60 }
+  const first = visibleTextBanners.value[0] ?? {}
+  return {
+    bg: first.bg_color || '#111111',
+    color: first.text_color || '#FFE08A',
+    speed: first.speed || 60,
+  }
 })
-const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.speed || 60))}s`)
+const marqueeDuration = computed(() =>
+  `${Math.max(8, 2000 / (bannerStyle.value.speed || 60))}s`
+)
 </script>
 
 <template>
@@ -96,7 +106,7 @@ const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.
            ========================= -->
            <!-- ===== テキスト・マルチ（右→左） ===== -->
 <!-- １本帯のテキストバナー -->
-<section v-if="props.text_banners.length" class="mb-3">
+<section v-if="visibleTextBanners.length" class="mb-3">
   <div class="relative overflow-hidden rounded-md"
        :style="{ backgroundColor: bannerStyle.bg, color: bannerStyle.color }">
 
@@ -105,13 +115,13 @@ const marqueeDuration = computed(() => `${Math.max(8, 2000 / (bannerStyle.value.
          :style="{ '--dur': marqueeDuration }">
       <!-- 2周分を連結 -->
       <div class="marquee-inner" v-for="rep in 2" :key="rep">
-        <template v-for="(tb, i) in props.text_banners" :key="`${rep}-${tb.id}`">
+        <template v-for="(tb, i) in visibleTextBanners" :key="`${rep}-${tb.id}`">
           <component :is="tb.url ? 'a' : 'span'"
                      :href="tb.url || undefined" target="_blank" rel="noopener"
                      class="inline-block px-4 py-2 hover:underline">
             {{ tb.message }}
           </component>
-          <span v-if="i !== props.text_banners.length - 1"
+          <span v-if="i !== visibleTextBanners.length - 1"
                 aria-hidden="true"
                 class="opacity-60 px-2">|</span>
         </template>
