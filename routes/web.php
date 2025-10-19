@@ -49,7 +49,9 @@ use App\Http\Controllers\HotelController as PublicHotelController;
 use App\Http\Controllers\CastLikeController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\RosterController;
 
+Route::get('/roster', [RosterController::class, 'index'])->name('roster.index');
 Route::get('/shifts', [ShiftController::class, 'index'])->name('shifts.index');
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::middleware('auth')->group(function () {
