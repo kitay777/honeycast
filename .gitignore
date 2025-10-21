@@ -29,3 +29,5 @@ composer.lock
 docker-compose.yml
 docker.zip
 += 100; $u->save();
+.env.001
+.env.002

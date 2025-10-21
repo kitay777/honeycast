@@ -57,6 +57,13 @@ use App\Http\Controllers\Admin\UserPointsController;
 
 use App\Http\Controllers\Admin\GiftController as AdminGiftController;
 use App\Http\Controllers\GiftSendController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+Route::get('/session-probe', function (\Illuminate\Http\Request $r) {
+    $r->session()->put('probe', true);
+    return response()->noContent();
+});
 
 Route::middleware(['auth','verified'])->group(function () {
     // 送った（ユーザー視点）

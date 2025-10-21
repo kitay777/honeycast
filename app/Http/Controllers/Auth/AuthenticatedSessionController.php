@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\User;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Hash;
+
 
 
 class AuthenticatedSessionController extends Controller
@@ -29,17 +32,33 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-public function store(LoginRequest $request)
+public function store(Request $request)
 {
-    $request->authenticate();
-    $request->session()->regenerate();
+    $request->validate([
+        'email'    => ['required', 'string', 'email'],
+        'password' => ['required', 'string'],
+    ]);
 
-    // ★ 保存しておいたトークンがあれば、すぐに消費ルートへ戻す
-    if ($token = $request->session()->pull('line_follow_token')) {
-        return redirect()->route('line.register.complete', ['t' => $token]);
+    $email = mb_strtolower(trim((string)$request->input('email')));
+    $password = (string)$request->input('password');
+
+    $user = \App\Models\User::where('email', $email)->first();
+    if (!$user || !\Illuminate\Support\Facades\Hash::check($password, $user->password)) {
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'email' => __('auth.failed'),
+        ]);
     }
 
-    return redirect()->intended(config('app.home', route('cast.profile.edit')));
+    \Illuminate\Support\Facades\Auth::login($user, $request->boolean('remember'));
+    $request->session()->regenerate(true);
+
+    // ★ ここがポイント：Inertiaリクエストなら「確実な遷移」を指示
+    if ($request->header('X-Inertia')) {
+        return Inertia::location(route('dashboard')); // ← ブラウザにハードリダイレクトを指示
+    }
+
+    // 通常のフォームでもOKなようにフォールバック
+    return redirect()->intended(route('dashboard', absolute:false))->setStatusCode(303);
 }
 
     /**
