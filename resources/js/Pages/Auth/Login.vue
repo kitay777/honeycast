@@ -96,7 +96,22 @@ const submit = () => {
                 >
                     Forgot your password?
                 </Link>
-<button :disabled="!warmed" class="btn-primary">LOG IN</button>
+<PrimaryButton
+  :disabled="!warmed || form.processing"
+  class="ml-4 inline-flex items-center justify-center
+         px-6 py-3 rounded-xl text-base font-bold tracking-wide
+         bg-gradient-to-r from-yellow-400 via-yellow-300 to-amber-400
+         text-black shadow-[0_6px_16px_rgba(255,200,0,0.35)]
+         hover:from-yellow-300 hover:to-yellow-400
+         focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2
+         disabled:opacity-50 disabled:cursor-not-allowed
+         transition-transform duration-150 active:scale-[0.98]">
+  <svg v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+    <path class="opacity-75" d="M4 12a8 8 0 018-8v4" stroke="currentColor" stroke-width="4"/>
+  </svg>
+  LOG IN
+</PrimaryButton>
             </div>
         </form>
     </GuestLayout>

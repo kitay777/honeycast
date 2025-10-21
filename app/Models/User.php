@@ -26,6 +26,7 @@ class User extends Authenticatable
         'is_admin',
         'shop_id',
         'is_cast',
+        'nickname','rank','age','height_cm','cup','style','alcohol','mbti',
     ];
 
     /**
