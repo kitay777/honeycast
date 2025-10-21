@@ -23,11 +23,14 @@ const showProhibited = ref(false);
                 </p>
                 <div class="text-left space-y-3">
                     <p>cast 1名　1set　60分　<span class="font-bold text-2xl">¥20,000</span></p>
-                    <p>基本サービスは全身リップ、フェラ、手コキ素股等になります。</p>
+                    <p>2時間の場合 <span class="font-bold">¥40,000</span></p>
+                    <p>3時間の場合 <span class="font-bold">¥60,000</span> になります。</p>
+                    <p>基本サービスは全身リップ、フェラ、手コキ、素股等になります。</p>
                     <p>事前にシャワーを浴びて頂きます。</p>
                     <p class="text-sm opacity-70">※ホテル、自宅以外の場所での基本サービスは行えません。</p>
                     <p>指名料　castにより　<span class="font-bold text-2xl">¥2,000〜</span></p>
                     <p class="text-sm opacity-70">※指名料は1度きりで毎セットかかる訳ではございません。</p>
+                    <p>派遣エリア：<span class="font-bold">新宿歌舞伎町（交通無料）</span></p>
                 </div>
             </section>
 
@@ -38,8 +41,10 @@ const showProhibited = ref(false);
                     お客様複数名に対して、castが最低2名以上からご利用が可能になります。
                 </p>
                 <div class="text-left space-y-3">
-                    <p>cast 1名　1set　60分　<span class="font-bold text-2xl">¥20,000</span></p>
-                    <p>基本サービスは全身リップ、フェラ、手コキ素股等になります。</p>
+                    <p>1set　60分　<span class="font-bold text-2xl">¥20,000</span></p>
+                    <p>2時間の場合 <span class="font-bold">¥40,000</span></p>
+                    <p>3時間の場合 <span class="font-bold">¥60,000</span> になります。</p>
+                    <p>基本サービスは全身リップ、フェラ、手コキ、素股等になります。</p>
                     <p>事前にシャワーを浴びて頂きます。</p>
                     <p class="text-sm opacity-70">※ホテル、自宅以外の場所での基本サービスは行えません。</p>
                     <p>指名料　castにより　<span class="font-bold text-2xl">¥2,000〜</span></p>
@@ -53,7 +58,10 @@ const showProhibited = ref(false);
                 <div class="text-left space-y-3">
                     <p>cast 1名　1set　60分　<span class="font-bold text-2xl">¥22,000</span></p>
                     <p class="text-sm opacity-70">
-                        ※castのシフト上の都合や、予約状況により延長ができない場合がございます。<br />
+                        ※castのシフト上の都合や、予約状況により延長ができない場合がございます。
+                    </p>
+                    <p>派遣エリア：<span class="font-bold">新宿歌舞伎町（交通無料）</span></p>
+                    <p class="text-sm opacity-70">
                         オプションが可能となっていても、女の子の体調次第では対応できない場合がございます。
                     </p>
                 </div>
@@ -64,22 +72,23 @@ const showProhibited = ref(false);
                 <p>クレジットカード決済でも領収書発行可能となります。</p>
 
                 <h3 class="font-bold text-xl mt-6 mb-2">基本内容について</h3>
-                <p>・1セット60分制（自動延長）となりますので、時間の管理はお客様でお願い致します。<br />CASTに終了時はお伝えください。</p>
+                <p>・1セット60分制（自動延長）となりますので、時間の管理はお客様でお願い致します。CASTに終了時はお伝えください。</p>
                 <p>・交通費は料金に含まれています。</p>
-                <p>・どんな場所でもCASTを派遣可能です（ホテル、ご自宅以外だとできるゲームに限りがあります）。<br />全てのサービスをお楽しみ頂きたいお客様は、ホテル・ご自宅にお呼び下さい。</p>
+                <p>・どんな場所でもCASTを派遣可能です（ホテル、ご自宅以外だとできるゲームに限りがあります）。全てのサービスをお楽しみ頂きたいお客様は、ホテル・ご自宅にお呼び下さい。</p>
 
                 <h3 class="font-bold text-xl mt-6 mb-2">派遣について</h3>
                 <p>・CASTは1名から派遣可能です（お客様が複数人の場合で、CASTを1名呼ぶ事も可能です）。</p>
                 <p>・お客様1名の場合のみ、CAST 1名との「チョ個っと」も可能です。</p>
-                <p>・「個別1：1」でCASTが現地に着いた時にお客様が複数人いた場合は、ゲームの利用禁止または即派遣中止となります。<br />その場合は1セット目の料金をいただきますのでお気をつけください。<br />この場合、「チョ個っと」と「団体チョコ」の差額をお支払い頂ければ、「団体チョコ」に移行が可能です。</p>
-                <p>・ゲームはCASTによって出来る・出来ないがあります。CASTのプロフィールにてご確認ください。</p>
+                <p>・「個別1：1」でCASTが現地に着いた時にお客様が複数人いた場合は、ゲームの利用禁止または即派遣中止となります。その場合は1セット目の料金はいただきますのでお気をつけください。この場合、「チョ個っと」と「団体チョコ」の差額をお支払い頂ければ、「団体チョコ」に移行が可能です。</p>
+                <p>・ゲームはCASTによって出来る・出来ないがありますため、CASTのプロフィールにてご確認くださいませ。</p>
                 <p>・王様ゲームを選んで頂いた場合、それ以降どのゲームを行っても追加料金はかかりません（王様ゲームは全ゲームやり放題プランになります）。</p>
-                <p>・お客様が「紳士であること」を前提に派遣させていただきます。CASTは放っておいても最高のパフォーマンスをいたしますので、どうか嫌がることはご遠慮ください。<br />至らない点があれば最後のアンケートにて運営にご連絡ください。</p>
+                <p>・お客様が「紳士であること」を前提に派遣させていただきます。CASTは放っておいても最高のパフォーマンスをいたしますのでどうか嫌がることはご遠慮ください。至らない点があれば最後のアンケートにて運営にご連絡ください。</p>
                 <p>・万が一、CASTからの報告でお客様の素行や暴力、暴言などが発覚した際は、今後サービスの利用禁止とさせていただきます。</p>
-                <p>・本番行為の強要や無断撮影等は禁止となります。発覚の際は即派遣中止となります。<br />その際も料金は発生し、返金はできません。今後のサービス利用も禁止となります。</p>
+                <p>・本番行為の強要も無断撮影等は禁止となります。発覚の際は即時に派遣中止となります。その際も料金は発生し返金はできません。今後サービスの利用禁止とさせていただきます。</p>
                 <p>・お電話などによる応答・対応は一切いたしておりませんのでご了承下さい。</p>
             </div>
-            <!-- 禁止事項ボタン -->
+
+            <!-- 禁止事項ボタン（※構造そのまま） -->
             <div class="flex flex-col items-center gap-3 mt-12">
                 <button
                     @click="showProhibited = !showProhibited"
@@ -88,15 +97,12 @@ const showProhibited = ref(false);
                     禁止事項
                 </button>
 
-                <!-- 禁止事項の内容 -->
                 <transition name="fade">
                     <div
                         v-if="showProhibited"
                         class="bg-black/70 text-white text-sm mt-6 p-6 rounded-2xl max-w-3xl leading-relaxed space-y-3"
                     >
-                        <h3 class="text-left text-2xl font-bold mb-4">
-                            禁止事項
-                        </h3>
+                        <h3 class="text-left text-2xl font-bold mb-4">禁止事項</h3>
                         <ul class="list-disc list-inside space-y-2 text-left">
                             <li>盗撮、盗聴行為及びそれに準ずる疑いのある行為は固く禁じます。</li>
                             <li>同業者様や同業関係者様のご利用は固く禁じます。</li>
@@ -134,9 +140,10 @@ const showProhibited = ref(false);
                         </p>
                     </div>
                 </transition>
-                </div>
-            <!-- ボタン -->
-            <div class="flex flex-col items-center gap-3  mt-12">
+            </div>
+
+            <!-- 予約/ゲーム ボタン（位置・見た目はそのまま） -->
+            <div class="flex flex-col items-center gap-3 mt-12">
                 <Link
                     :href="route('call.create')"
                     class="px-14 py-4 rounded-full text-xl bg-gradient-to-r from-[#caa14b] to-[#f0e1b1] text-black font-bold tracking-[0.5em] shadow text-left"
@@ -154,14 +161,10 @@ const showProhibited = ref(false);
         </div>
     </AppLayout>
 </template>
+
 <style scoped>
 .fade-enter-active,
-.fade-leave-active {
-    transition: all 0.3s ease;
-}
+.fade-leave-active { transition: all 0.3s ease; }
 .fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-    transform: translateY(-10px);
-}
+.fade-leave-to { opacity: 0; transform: translateY(-10px); }
 </style>
