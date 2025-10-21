@@ -59,6 +59,9 @@ use App\Http\Controllers\Admin\GiftController as AdminGiftController;
 use App\Http\Controllers\GiftSendController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\CastQrController;
+
+Route::get('/cast/qr', [CastQrController::class, 'show'])->name('cast.qr');
 
 Route::get('/session-probe', function (\Illuminate\Http\Request $r) {
     $r->session()->put('probe', true);
@@ -238,11 +241,11 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/photos/{castPhoto}/unblur-requests/{permission}/deny', [CastPhotoPermissionController::class, 'deny'])
         ->name('photos.unblur.deny');
 });
-Route::middleware('guest')->group(function () {
+
+Route::middleware('guest.or.admin')->group(function () {
     Route::get ('/register/cast', [CastRegisterController::class, 'create'])->name('cast.register');
     Route::post('/register/cast', [CastRegisterController::class, 'store'])->name('cast.register.store');
 });
-
 // 既存ユーザーが“キャスト化”だけしたい場合（任意）
 Route::middleware(['auth'])->post('/cast/upgrade', [CastRegisterController::class, 'upgrade'])
     ->name('cast.upgrade');
@@ -291,7 +294,7 @@ Route::get('/s/{token}', [\App\Http\Controllers\Public\InviteCaptureController::
     ->name('shop.invite.capture');
 
     // 👇 管理者じゃなく「オーナー」用。adminグループの“外”に置く
-Route::middleware(['auth','verified','can:shop-owner'])
+Route::middleware(['auth','verified'])
     ->prefix('my')->name('my.')
     ->group(function () {
         Route::get('/shop', [\App\Http\Controllers\Owner\PortalController::class, 'index'])

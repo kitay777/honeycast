@@ -1,27 +1,44 @@
 <script setup>
 import { Link, usePage } from "@inertiajs/vue3";
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 
 const page = usePage();
-const isMenuOpen = ref(false);
+const modal = ref(page.props.flash?.modal ?? null);
+watch(
+    () => page.props.flash,
+    (f) => {
+        modal.value = f?.modal ?? null;
+    }
+);
 
+const closeModal = () => {
+    modal.value = null;
+};
+
+const isMenuOpen = ref(false);
 const openMenu = () => {
     isMenuOpen.value = true;
-    document.documentElement.classList.add("overflow-hidden");
 };
 const closeMenu = () => {
     isMenuOpen.value = false;
-    document.documentElement.classList.remove("overflow-hidden");
 };
 
-// ESCで閉じる
+// ★ モーダル or メニュー表示時は body スクロールを止める
+const toggleBodyScroll = () => {
+    const locked = !!modal.value || isMenuOpen.value;
+    document.documentElement.classList.toggle("overflow-hidden", locked);
+};
+watch(modal, toggleBodyScroll);
+watch(isMenuOpen, toggleBodyScroll);
+
+// ESC で「まずモーダル→次にメニュー」を閉じる
 const onKeydown = (e) => {
-    if (e.key === "Escape") closeMenu();
+    if (e.key !== "Escape") return;
+    if (modal.value) return closeModal();
+    if (isMenuOpen.value) return closeMenu();
 };
 
-onMounted(() => {
-    window.addEventListener("keydown", onKeydown);
-});
+onMounted(() => window.addEventListener("keydown", onKeydown));
 onBeforeUnmount(() => {
     window.removeEventListener("keydown", onKeydown);
     document.documentElement.classList.remove("overflow-hidden");
@@ -112,6 +129,33 @@ onBeforeUnmount(() => {
             </button>
         </header>
 
+        <!-- ★ ポップアップ（簡易モーダル） -->
+        <!-- 背景クリックで閉じる -->
+        <div
+            v-if="modal"
+            class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
+            @click.self="closeModal"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="modal.title || 'お知らせ'"
+        >
+            <div
+                class="bg-white text-black w-[92vw] max-w-md rounded-2xl p-6 shadow-xl"
+            >
+                <h3 class="text-xl font-bold mb-2">
+                    {{ modal.title || "お知らせ" }}
+                </h3>
+                <p class="mb-6 whitespace-pre-line">{{ modal.message }}</p>
+                <div class="text-right">
+                    <button
+                        @click="closeModal"
+                        class="px-4 py-2 rounded bg-gray-900 text-white"
+                    >
+                        閉じる
+                    </button>
+                </div>
+            </div>
+        </div>
         <!-- コンテンツ部分 -->
         <main class="pt-16 pb-20 overflow-y-auto">
             <slot />
@@ -245,11 +289,17 @@ onBeforeUnmount(() => {
                     >HOTEL LIST</Link
                 >
                 <Link
-                    href="/recruit"
+                    v-if="
+                        page.props.auth?.user &&
+                        (page.props.auth.user.is_admin ||
+                            page.props.auth.user.is_shop_owner)
+                    "
+                    href="/cast/qr"
                     class="block px-5 py-4 hover:bg-white/10"
                     @click="closeMenu"
-                    >RECRUIT</Link
                 >
+                    RECRUIT
+                </Link>
 
                 <Link
                     href="/mypage"

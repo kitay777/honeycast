@@ -39,5 +39,16 @@ class AppServiceProvider extends ServiceProvider
 
             return ['unread_total' => $unread];
         });
+        Inertia::share('flash', function () {
+            // pull で一度だけ取り出す
+            return [
+                'modal' => session()->pull('modal'), 
+            ];
+        });
+        Inertia::share('auth', function () {
+            return [
+                'user' => auth()->user() ? auth()->user()->only(['id','name','is_admin','is_shop_owner']) : null,
+            ];
+        });
     }
 }
