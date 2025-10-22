@@ -1,7 +1,10 @@
 <script setup>
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3";
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+
+/** 下段パネル参照 */
+const lowerPaneRef = ref(null);
 
 /** route() のフォールバック */
 const urlFor = (name, params = {}, fallback = "") => {
@@ -21,7 +24,8 @@ const props = defineProps({
 });
 
 const page = usePage();
-const flash = computed(() => page.props?.value?.flash ?? {});
+/** Inertia の flash は page.props.flash */
+const flash = computed(() => page.props?.flash ?? {});
 
 /* 一覧・検索 */
 const usersData = computed(() => props.users?.data ?? []);
@@ -93,13 +97,26 @@ onBeforeUnmount(() => {
   setBodyDragCursor(false);
 });
 
+/* ===== 下段内スクロールの共通関数 ===== */
+function scrollToInLowerPane(targetId, offset = 12) {
+  const pane = lowerPaneRef.value;
+  const box  = document.getElementById(targetId);
+  if (!pane || !box) return false;
+  const top = box.offsetTop - offset;
+  pane.scrollTo({ top, behavior: "smooth" });
+  return true;
+}
+
 /* 編集フォーム */
 const selectedId = ref(null);
 const form = useForm({ id: null, name: "", email: "", phone: "", area: "", is_admin: false });
 const title = computed(() => (form.id ? "ユーザー編集" : "新規ユーザー"));
 
 function resetForm() {
-  form.reset(); form.clearErrors(); form.id = null; selectedId.value = null;
+  form.reset();
+  form.clearErrors();
+  form.id = null;
+  selectedId.value = null;
   resetPointsPanel(); // ポイントパネル初期化
 }
 function selectForEdit(u) {
@@ -111,13 +128,28 @@ function selectForEdit(u) {
   form.area = u.area || "";
   form.is_admin = !!u.is_admin;
   loadPoints(u.id); // ポイント読み込み
+
+  // 値反映後に下段フォームへスクロール＆先頭入力へフォーカス
+  nextTick(() => {
+    const ok = scrollToInLowerPane("edit-form-box");
+    if (!ok) {
+      document.getElementById("edit-form-box")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    document.querySelector("#edit-form-box input")?.focus();
+  });
 }
-function submitCreate() { form.post("/admin/users", { onSuccess: () => resetForm() }); }
-function submitUpdate() { form.put(`/admin/users/${form.id}`); }
+function submitCreate() {
+  form.post("/admin/users", { onSuccess: () => resetForm() });
+}
+function submitUpdate() {
+  form.put(`/admin/users/${form.id}`);
+}
 function remove(u) {
   if (u.id === props.me?.id) { alert("自分自身は削除できません"); return; }
   if (!confirm("削除しますか？")) return;
-  router.delete(`/admin/users/${u.id}`, { onSuccess: () => { if (selectedId.value === u.id) resetForm(); } });
+  router.delete(`/admin/users/${u.id}`, {
+    onSuccess: () => { if (selectedId.value === u.id) resetForm(); }
+  });
 }
 
 /* ───────── LINE 送信（個別） ───────── */
@@ -135,7 +167,11 @@ async function sendLine() {
 }
 function openLineAndScroll(u) {
   selectForEdit(u);
-  setTimeout(() => { document.getElementById("line-send-box")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 0);
+  setTimeout(() => {
+    if (!scrollToInLowerPane("line-send-box")) {
+      document.getElementById("line-send-box")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, 0);
 }
 
 /* ───────── ポイント：履歴＋調整 ───────── */
@@ -192,8 +228,13 @@ async function submitPoints() {
       <div class="px-5 py-3 bg-white border-b flex items-center justify-between">
         <div class="text-xl font-semibold">ユーザー管理</div>
         <div class="flex gap-2">
-          <input v-model="q" @keyup.enter="search" type="text" class="border rounded px-3 py-2 w-72"
-                 placeholder="名前 / メール / エリア / 電話 を検索" />
+          <input
+            v-model="q"
+            @keyup.enter="search"
+            type="text"
+            class="border rounded px-3 py-2 w-72"
+            placeholder="名前 / メール / エリア / 電話 を検索"
+          />
           <button @click="search" class="px-4 py-2 rounded bg-black text-white">検索</button>
           <button @click="resetForm" class="px-3 py-2 rounded bg-gray-100">＋ 新規</button>
         </div>
@@ -209,9 +250,12 @@ async function submitPoints() {
           ユーザーがいません（または読み込み中）
         </div>
 
-        <div v-for="u in usersData" :key="u.id"
-             class="px-4 py-3 flex items-center justify-between hover:bg-gray-50"
-             :class="selectedId === u.id ? 'bg-gray-50' : ''">
+        <div
+          v-for="u in usersData"
+          :key="u.id"
+          class="px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+          :class="selectedId === u.id ? 'bg-gray-50' : ''"
+        >
           <div>
             <div class="font-medium">
               {{ u.name }} <span class="text-xs text-gray-500 ml-2">#{{ u.id }}</span>
@@ -228,7 +272,9 @@ async function submitPoints() {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <Link :href="`/admin/casts?q=${encodeURIComponent(u.email)}`" class="text-xs px-2 py-1 rounded border">キャストを見る</Link>
+            <Link :href="`/admin/casts?q=${encodeURIComponent(u.email)}`" class="text-xs px-2 py-1 rounded border">
+              キャストを見る
+            </Link>
             <button @click="selectForEdit(u)" class="text-sm px-2 py-1 rounded bg-blue-600 text-white">編集</button>
             <button @click="openLineAndScroll(u)" class="text-sm px-2 py-1 rounded bg-emerald-600 text-white">LINE送信</button>
             <button @click="remove(u)" class="text-sm px-2 py-1 rounded bg-red-600 text-white">削除</button>
@@ -238,23 +284,29 @@ async function submitPoints() {
 
       <!-- ページネーション -->
       <div class="mt-4 flex gap-2 flex-wrap">
-        <Link v-for="(lnk, i) in usersLinks" :key="i" :href="lnk.url || '#'"
-              class="px-3 py-1 border rounded"
-              :class="[ lnk.active ? 'bg-black text-white' : '', !lnk.url ? 'opacity-50 pointer-events-none' : '' ]"
-              v-html="lnk.label" />
+        <Link
+          v-for="(lnk, i) in usersLinks"
+          :key="i"
+          :href="lnk.url || '#'"
+          class="px-3 py-1 border rounded"
+          :class="[ lnk.active ? 'bg-black text-white' : '', !lnk.url ? 'opacity-50 pointer-events-none' : '' ]"
+          v-html="lnk.label"
+        />
       </div>
     </div>
 
     <!-- 仕切り（Pointer Events で確実に終わる） -->
-    <div id="splitter"
-         class="h-2 bg-gray-200 hover:bg-gray-300 cursor-row-resize"
-         @pointerdown="startDrag"
-         @pointermove="onPointerMove"
-         @pointerup="endDrag"></div>
+    <div
+      id="splitter"
+      class="h-2 bg-gray-200 hover:bg-gray-300 cursor-row-resize"
+      @pointerdown="startDrag"
+      @pointermove="onPointerMove"
+      @pointerup="endDrag"
+    ></div>
 
-    <!-- 下：フォーム -->
-    <div class="p-4 overflow-auto" :style="{ height: `calc(${100 - topPct}% - 2px)` }">
-      <div class="bg-white rounded-2xl shadow p-4">
+    <!-- 下：フォーム＆各パネル（下段パネル内スクロール対象） -->
+    <div class="p-4 overflow-auto" :style="{ height: `calc(${100 - topPct}% - 2px)` }" ref="lowerPaneRef">
+      <div class="bg-white rounded-2xl shadow p-4" id="edit-form-box">
         <h2 class="text-lg font-semibold mb-3">{{ title }}</h2>
 
         <form @submit.prevent="form.id ? submitUpdate() : submitCreate()" class="grid grid-cols-12 gap-3">
@@ -283,8 +335,13 @@ async function submitPoints() {
           </div>
 
           <div class="col-span-12 flex gap-2 pt-2">
-            <button type="submit" class="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
-                    :disabled="form.processing">{{ form.id ? "更新する" : "作成する" }}</button>
+            <button
+              type="submit"
+              class="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+              :disabled="form.processing"
+            >
+              {{ form.id ? "更新する" : "作成する" }}
+            </button>
             <button type="button" @click="resetForm" class="px-4 py-2 rounded bg-gray-100">クリア</button>
           </div>
         </form>
@@ -311,8 +368,10 @@ async function submitPoints() {
               <label class="text-sm">理由（任意）</label>
               <input v-model="pointsForm.reason" type="text" class="border rounded px-3 py-2 w-64" />
             </div>
-            <button :disabled="pointsForm.processing || !form.id"
-                    class="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-60">
+            <button
+              :disabled="pointsForm.processing || !form.id"
+              class="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-60"
+            >
               反映
             </button>
           </form>
@@ -348,8 +407,12 @@ async function submitPoints() {
         </div>
         <div class="space-y-2">
           <label class="block text-sm">メッセージ</label>
-          <textarea v-model="lineForm.text" rows="4" class="w-full border rounded px-3 py-2"
-                    placeholder="送信内容（最大1000文字）"></textarea>
+          <textarea
+            v-model="lineForm.text"
+            rows="4"
+            class="w-full border rounded px-3 py-2"
+            placeholder="送信内容（最大1000文字）"
+          ></textarea>
 
           <label class="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" v-model="lineForm.notification_disabled" />
@@ -357,10 +420,13 @@ async function submitPoints() {
           </label>
 
           <div class="mt-1 flex items-center gap-2">
-            <button type="button" @click="sendLine"
-                    :disabled="sendingLine || !form.id || !lineForm.text"
-                    class="px-4 py-2 rounded text-white"
-                    :class="(sendingLine || !form.id || !lineForm.text) ? 'bg-gray-400' : 'bg-emerald-600 hover:brightness-110'">
+            <button
+              type="button"
+              @click="sendLine"
+              :disabled="sendingLine || !form.id || !lineForm.text"
+              class="px-4 py-2 rounded text-white"
+              :class="(sendingLine || !form.id || !lineForm.text) ? 'bg-gray-400' : 'bg-emerald-600 hover:brightness-110'"
+            >
               送信
             </button>
             <span class="text-xs text-gray-500">※ 未連携の場合はエラーが返ります</span>
