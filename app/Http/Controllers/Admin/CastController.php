@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CastProfile;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -16,20 +17,23 @@ class CastController extends Controller
         $q = $request->string('q')->toString();
 
         $casts = CastProfile::with('user:id,name,email,area')
+            // ← 検索は括弧でグルーピングして or の漏れを防止
             ->when($q, function ($query) use ($q) {
-                $query->where('nickname', 'like', "%{$q}%")
-                    ->orWhereHas('user', fn($uq) =>
-                        $uq->where('name', 'like', "%{$q}%")
-                           ->orWhere('email', 'like', "%{$q}%")
-                           ->orWhere('area', 'like', "%{$q}%")
-                    );
+                $query->where(function ($w) use ($q) {
+                    $w->where('nickname', 'like', "%{$q}%")
+                      ->orWhereHas('user', fn($uq) =>
+                          $uq->where('name',  'like', "%{$q}%")
+                             ->orWhere('email','like', "%{$q}%")
+                             ->orWhere('area', 'like', "%{$q}%")
+                      );
+                });
             })
             ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
 
         return Inertia::render('Admin/Casts/Index', [
-            'casts' => $casts,
+            'casts'   => $casts,
             'filters' => ['q' => $q],
         ]);
     }
@@ -38,23 +42,20 @@ class CastController extends Controller
     {
         $data = $this->validated($request);
 
-        // ユーザー作成（メール重複なら既存再利用）
         $user = User::firstOrCreate(
             ['email' => $request->string('email')->toString()],
             [
                 'name'     => $request->string('name')->toString(),
                 'area'     => $request->string('area')->toString(),
-                'password' => bcrypt(str()->random(16)), // 仮パス
+                'password' => bcrypt(str()->random(16)),
             ]
         );
 
-        // 画像アップロード
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $photoPath = $request->file('photo')->store('cast_photos', 'public');
         }
 
-        // CastProfile 作成（validatedに合わせてフィールド統一 + ブラー既定）
         CastProfile::create([
             'user_id'         => $user->id,
             'nickname'        => $data['nickname']   ?? null,
@@ -70,7 +71,7 @@ class CastController extends Controller
             'freeword'        => $data['freeword']   ?? null,
             'photo_path'      => $photoPath,
             'is_blur_default' => array_key_exists('is_blur_default', $data)
-                                  ? (bool)$data['is_blur_default'] : true, // 既定はブラーON
+                                  ? (bool)$data['is_blur_default'] : true,
         ]);
 
         return back()->with('success', 'キャストを作成しました');
@@ -80,7 +81,7 @@ class CastController extends Controller
     {
         $data = $this->validated($request, updating: true);
 
-        // User側も更新可
+        // User 側（filled の項目のみ）
         if ($request->filled('name') || $request->filled('email') || $request->filled('area')) {
             $cast->user->fill([
                 'name'  => $request->filled('name')  ? $request->string('name')->toString()  : $cast->user->name,
@@ -97,16 +98,17 @@ class CastController extends Controller
             $cast->photo_path = $request->file('photo')->store('cast_photos', 'public');
         }
 
-        // CastProfile 側
-        $cast->fill($data);
+        // CastProfile 側（許可項目のみ反映）
+        $cast->fill(Arr::only($data, [
+            'nickname','rank','age','height_cm','cup','style','alcohol','mbti',
+            'area','tags','freeword',
+        ]));
 
-        // is_blur_default は明示（boolean）
         if ($request->has('is_blur_default')) {
             $cast->is_blur_default = $request->boolean('is_blur_default');
         }
 
         $cast->save();
-
         return back()->with('success', '更新しました');
     }
 
@@ -122,12 +124,12 @@ class CastController extends Controller
     private function validated(Request $request, bool $updating = false): array
     {
         return $request->validate([
-            // User 側
-            'name'   => [$updating ? 'sometimes' : 'required','string','max:255'],
-            'email'  => [$updating ? 'sometimes' : 'required','email','max:255'],
+            // User 側（更新時は nullable + sometimes）
+            'name'   => [$updating ? 'sometimes' : 'required', $updating ? 'nullable' : 'string', 'string','max:255'],
+            'email'  => [$updating ? 'sometimes' : 'required', 'nullable','email','max:255'],
             'area'   => ['sometimes','nullable','string','max:255'],
 
-            // CastProfile 側（実スキーマ）
+            // CastProfile 側
             'nickname'        => ['nullable','string','max:255'],
             'rank'            => ['nullable','string','max:50'],
             'age'             => ['nullable','integer','min:0','max:120'],
@@ -140,7 +142,6 @@ class CastController extends Controller
             'freeword'        => ['nullable','string','max:2000'],
             'photo'           => ['nullable','image','max:4096'],
 
-            // ★ ブラー既定フラグ
             'is_blur_default' => ['sometimes','boolean'],
         ]);
     }
