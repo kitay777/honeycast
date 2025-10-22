@@ -7,8 +7,8 @@ const props = defineProps({
   menus: {
     type: Array,
     default: () => ([
-      { key: 'users', label: 'キャスト管理', to: '/admin/users' },
-      { key: 'casts', label: 'ユーザー管理', to: '/admin/casts' },
+      { key: 'users', label: 'ユーザー管理', to: '/admin/users' },
+      { key: 'casts', label: 'キャスト管理', to: '/admin/casts' },
       
       { key: 'points', label: 'ポイント管理', to: '/admin/points' },
       { key: 'requests',   label: 'リクエスト',   to: '/admin/requests' },
