@@ -28,8 +28,9 @@ const showProhibited = ref(false);
           <p>指名料　castにより　<span class="font-bold text-2xl">¥2,000〜</span></p>
           <p class="text-sm opacity-70">※指名料は1度きりで、毎セットかかる訳ではございません。</p>
 
+        <p> </p>
           <p>派遣エリア：<span class="font-bold">新宿歌舞伎町（交通無料）</span></p>
-          <p>電話：<span class="font-bold">03-4400-0455</span></p>
+          <p class="my-4">電話：<span class="text-3xl font-extrabold">03-4400-0455</span></p>
         </div>
       </section>
 
@@ -56,9 +57,10 @@ const showProhibited = ref(false);
         <div class="text-left space-y-3">
           <p>cast 1名　1set　60分　<span class="font-bold text-2xl">¥22,000</span></p>
           <p class="text-sm opacity-70">※castのシフト上の都合や予約状況により、延長できない場合がございます。</p>
-
+        <p> </p>
           <p>派遣エリア：<span class="font-bold">新宿歌舞伎町（交通無料）</span></p>
-          <p>電話：<span class="font-bold">03-4400-0455</span></p>
+
+          <p class="my-4">電話：<span class="text-3xl font-extrabold">03-4400-0455</span></p>
 
           <p class="text-sm opacity-70">
             ※オプションが可能となっていても、女の子の体調次第では対応できない場合がございます。
