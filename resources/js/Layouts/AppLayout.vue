@@ -89,7 +89,7 @@ onBeforeUnmount(() => {
 
             <Link
                 href="/shifts"
-                class="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 border border-white/20 hover:bg-white/20"
+                class="flex flex-col items-center"
             >
                 <img
                     :src="
