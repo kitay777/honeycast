@@ -60,6 +60,20 @@ use App\Http\Controllers\GiftSendController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\CastQrController;
+use App\Http\Controllers\Admin\CastPhotoController;
+
+Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () {
+    // …既存の Casts ルート…
+
+    // Cast の写真管理 API
+    Route::prefix('casts/{cast}')->name('casts.')->group(function () {
+        Route::get('photos',                [CastPhotoController::class, 'index'])->name('photos.index');       // 一覧(JSON)
+        Route::post('photos',               [CastPhotoController::class, 'store'])->name('photos.store');       // 複数アップ
+        Route::put('photos/{photo}',        [CastPhotoController::class, 'update'])->name('photos.update');     // キャプション/ブラー/メイン
+        Route::patch('photos/reorder',      [CastPhotoController::class, 'reorder'])->name('photos.reorder');   // 並び替え
+        Route::delete('photos/{photo}',     [CastPhotoController::class, 'destroy'])->name('photos.destroy');   // 削除
+    });
+});
 
 Route::get('/cast/qr', [CastQrController::class, 'show'])->name('cast.qr');
 
@@ -429,8 +443,9 @@ Route::get('/ranking', [RankingController::class, 'index'])
     ->middleware(['auth','verified'])
     ->name('ranking');
 
+
+Route::get('/casts/{cast}', [CastController::class, 'show'])->name('casts.show');
 Route::middleware(['auth','verified'])->group(function () {
-    Route::get('/casts/{cast}', [CastController::class, 'show'])->name('casts.show');
 
     // スケジュール編集
     Route::get('/casts/{cast}/schedule', [CastController::class, 'editSchedule'])->name('casts.schedule.edit');
@@ -439,7 +454,6 @@ Route::middleware(['auth','verified'])->group(function () {
 
 
 Route::get('/dashboard', [HomeController::class, 'index'])
-    ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
 Route::get('/search', [CastSearchController::class, 'index'])->name('cast.search');

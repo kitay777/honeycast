@@ -2,6 +2,7 @@
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3";
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+import CastPhotosManager from '@/Components/Admin/CastPhotosManager.vue'
 
 /** route() フォールバック */
 const urlFor = (name, params = {}, fallback = "") => {
@@ -316,6 +317,10 @@ async function submitPoints(){
             <input type="file" @change="e => (form.photo = e.target.files?.[0] ?? null)" />
           </div>
 
+          <div v-if="form.id" class="mt-4 bg-white rounded-2xl shadow p-4">
+            <h3 class="text-lg font-semibold mb-2">写真（メイン／サブ）</h3>
+            <CastPhotosManager :cast-id="form.id" />
+          </div>
           <div class="col-span-12 flex gap-2 pt-2">
             <button type="submit" class="px-4 py-2 rounded bg-black text-white disabled:opacity-50" :disabled="form.processing">
               {{ form.id ? "更新する" : "作成する" }}
