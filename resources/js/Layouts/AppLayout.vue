@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
             >
                 <img
                     :src="
-                        page.url === '/likes'
+                        page.url === '/shifts'
                             ? '/assets/icons/schon.png'
                             : '/assets/icons/sch.png'
                     "
