@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 
 const props = defineProps({
   castId: [Number, String],
@@ -16,6 +16,12 @@ const csrf = document
   .querySelector('meta[name="csrf-token"]')
   ?.getAttribute("content");
 
+  watch(() => props.castId, async (newVal, oldVal) => {
+  if (newVal && newVal !== oldVal) {
+    console.log(`Cast changed: ${oldVal} → ${newVal}`);
+    await loadPhotos();
+  }
+});
 // 共通fetch（FormData対応）
 async function csrfFetch(url, options = {}) {
   const headers = {};
@@ -142,11 +148,13 @@ onMounted(loadPhotos);
         :key="p.id"
         class="relative border rounded-xl overflow-hidden shadow hover:shadow-lg transition"
       >
-        <img
-          :src="p.url"
-          class="object-cover w-full h-36"
-          :class="{ 'blur-sm': p.should_blur }"
-        />
+<img
+  :src="p.url"
+  class="w-full max-h-64 object-contain mx-auto rounded bg-black/5"
+  style="aspect-ratio: auto;"
+  alt=""
+/>
+        
         <div
           class="absolute top-0 left-0 right-0 bg-black/40 text-white text-xs flex justify-between px-1"
         >
