@@ -1,137 +1,195 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted } from "vue";
 
 const props = defineProps({
-  castId: { type: [Number, String], required: true },
-})
+  castId: [Number, String],
+});
 
-const loading = ref(false)
-const photos  = ref([])  // {id,url,caption,should_blur,is_primary,sort_order}
-const files   = ref([])  // ローカル選択
+const photos = ref([]);
+const loading = ref(false);
+const uploading = ref(false);
+const newFiles = ref([]);
+const shouldBlur = ref(false);
 
-async function fetchList() {
-  loading.value = true
-  try {
-    const res = await fetch(`/admin/casts/${props.castId}/photos`, { headers: { Accept:'application/json' }})
-    photos.value = await res.json()
-  } finally {
-    loading.value = false
+// ✅ CSRFトークン
+const csrf = document
+  .querySelector('meta[name="csrf-token"]')
+  ?.getAttribute("content");
+
+// 共通fetch（FormData対応）
+async function csrfFetch(url, options = {}) {
+  const headers = {};
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
   }
+  headers["X-CSRF-TOKEN"] = csrf;
+
+  const merged = {
+    credentials: "same-origin",
+    headers,
+    ...options,
+  };
+
+  return await fetch(url, merged);
 }
 
-onMounted(fetchList)
-
-function onFileChange(e){
-  files.value = Array.from(e.target.files ?? [])
+// 一覧取得
+async function loadPhotos() {
+  loading.value = true;
+  const res = await fetch(`/admin/casts/${props.castId}/photos`, {
+    headers: { Accept: "application/json" },
+    credentials: "same-origin",
+  });
+  photos.value = await res.json();
+  loading.value = false;
 }
 
-async function uploadAll(){
-  if (!files.value.length) return
-  const fd = new FormData()
-  files.value.forEach(f => fd.append('photos[]', f))
-  // 必要なら一括ブラー指定: fd.append('should_blur','1')
-  const res = await fetch(`/admin/casts/${props.castId}/photos`, { method:'POST', body: fd })
-  const json = await res.json()
-  photos.value = json.photos
-  files.value = []
+// ✅ ファイル選択イベント
+function onFileChange(e) {
+  const files = Array.from(e.target.files || []);
+  newFiles.value = files;
+  // Vue reactivity 対応 → 手動で更新を発火
+  if (files.length > 0) console.log("選択されたファイル数:", files.length);
 }
 
-async function setPrimary(p){
-  await fetch(`/admin/casts/${props.castId}/photos/${p.id}`, {
-    method:'PUT',
-    headers: { 'Content-Type':'application/json' },
-    body: JSON.stringify({ is_primary: !p.is_primary }),
-  })
-  await fetchList()
+// ✅ アップロード
+async function upload() {
+  if (!newFiles.value.length) return;
+  uploading.value = true;
+  const fd = new FormData();
+  for (const f of newFiles.value) fd.append("photos[]", f);
+  fd.append("should_blur", shouldBlur.value ? "1" : "0");
+
+  const res = await csrfFetch(`/admin/casts/${props.castId}/photos`, {
+    method: "POST",
+    body: fd,
+  });
+
+  if (res.ok) {
+    await loadPhotos();
+    newFiles.value = [];
+  } else {
+    const txt = await res.text();
+    console.error("Upload failed:", txt);
+    alert("アップロードに失敗しました");
+  }
+  uploading.value = false;
 }
 
-async function toggleBlur(p){
-  await fetch(`/admin/casts/${props.castId}/photos/${p.id}`, {
-    method:'PUT',
-    headers: { 'Content-Type':'application/json' },
+// ✅ 削除
+async function remove(p) {
+  if (!confirm("この写真を削除しますか？")) return;
+  const res = await csrfFetch(`/admin/casts/${props.castId}/photos/${p.id}`, {
+    method: "DELETE",
+  });
+  if (res.ok) await loadPhotos();
+}
+
+// ✅ 主設定
+async function setPrimary(p) {
+  const res = await csrfFetch(`/admin/casts/${props.castId}/photos/${p.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ is_primary: true }),
+  });
+  if (res.ok) await loadPhotos();
+}
+
+// ✅ ぼかしトグル
+async function toggleBlur(p) {
+  const res = await csrfFetch(`/admin/casts/${props.castId}/photos/${p.id}`, {
+    method: "PUT",
     body: JSON.stringify({ should_blur: !p.should_blur }),
-  })
-  p.should_blur = !p.should_blur
+  });
+  if (res.ok) await loadPhotos();
 }
 
-async function saveCaption(p){
-  await fetch(`/admin/casts/${props.castId}/photos/${p.id}`, {
-    method:'PUT',
-    headers: { 'Content-Type':'application/json' },
-    body: JSON.stringify({ caption: p.caption ?? '' }),
-  })
-}
+// ✅ 並び替え：上下ボタンで並べ替え
+async function move(p, dir) {
+  const idx = photos.value.findIndex((x) => x.id === p.id);
+  if (idx < 0) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= photos.value.length) return;
 
-async function removePhoto(p){
-  if(!confirm('この写真を削除しますか？')) return
-  await fetch(`/admin/casts/${props.castId}/photos/${p.id}`, { method:'DELETE' })
-  photos.value = photos.value.filter(x => x.id !== p.id)
-}
+  // 配列上で入れ替え
+  const arr = [...photos.value];
+  const tmp = arr[idx];
+  arr[idx] = arr[newIdx];
+  arr[newIdx] = tmp;
+  photos.value = arr;
 
-/* ---- 並び替え（ネイティブD&D） ---- */
-let dragIndex = null
-function onDragStart(i){ dragIndex = i }
-function onDragOver(e){ e.preventDefault() }
-async function onDrop(i){
-  if (dragIndex === null || dragIndex === i) return
-  const moved = photos.value.splice(dragIndex,1)[0]
-  photos.value.splice(i,0,moved)
-  dragIndex = null
-  // id 配列を送って確定
-  const order = photos.value.map(p => p.id)
-  await fetch(`/admin/casts/${props.castId}/photos/reorder`, {
-    method:'PATCH',
-    headers: { 'Content-Type':'application/json' },
+  // サーバーへ並び順送信
+  const order = photos.value.map((x) => x.id);
+  const res = await csrfFetch(`/admin/casts/${props.castId}/photos/reorder`, {
+    method: "PATCH",
     body: JSON.stringify({ order }),
-  })
+  });
+  if (res.ok) await loadPhotos();
 }
+
+onMounted(loadPhotos);
 </script>
 
 <template>
-  <div class="space-y-3">
-    <div class="flex items-center gap-3">
-      <input type="file" multiple accept="image/*" @change="onFileChange" />
-      <button class="px-3 py-2 rounded bg-black text-white disabled:opacity-50"
-              :disabled="!files.length" @click="uploadAll">
-        画像をアップロード
-      </button>
-      <span v-if="files.length" class="text-xs text-gray-600">
-        選択中: {{ files.length }} 件
-      </span>
+  <div class="space-y-4">
+    <div v-if="loading" class="text-gray-500">読み込み中...</div>
+
+    <div
+      v-else
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
+    >
+      <div
+        v-for="p in photos"
+        :key="p.id"
+        class="relative border rounded-xl overflow-hidden shadow hover:shadow-lg transition"
+      >
+        <img
+          :src="p.url"
+          class="object-cover w-full h-36"
+          :class="{ 'blur-sm': p.should_blur }"
+        />
+        <div
+          class="absolute top-0 left-0 right-0 bg-black/40 text-white text-xs flex justify-between px-1"
+        >
+          <span>#{{ p.sort_order }}</span>
+          <span v-if="p.is_primary" class="text-yellow-300 font-bold">★</span>
+        </div>
+        <div
+          class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs flex justify-center gap-2 py-0.5"
+        >
+          <button @click="setPrimary(p)">主</button>
+          <button @click="toggleBlur(p)">
+            {{ p.should_blur ? "明" : "ぼ" }}
+          </button>
+          <button @click="move(p, -1)">↑</button>
+          <button @click="move(p, 1)">↓</button>
+          <button @click="remove(p)">削</button>
+        </div>
+      </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-gray-500">読み込み中…</div>
-    <div v-else-if="!photos.length" class="text-sm text-gray-500">まだ写真がありません。</div>
-
-    <ul v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      <li v-for="(p,i) in photos" :key="p.id"
-          class="rounded-xl border overflow-hidden bg-white"
-          draggable="true"
-          @dragstart="onDragStart(i)"
-          @dragover="onDragOver"
-          @drop="onDrop(i)">
-        <div class="relative">
-          <img :src="p.url" class="w-full h-40 object-cover" :class="p.should_blur ? 'blur-sm' : ''" />
-          <button class="absolute top-2 left-2 text-xs px-2 py-1 rounded bg-white/80"
-                  :class="p.is_primary ? 'border border-yellow-500 text-yellow-600' : 'border'"
-                  @click="setPrimary(p)">
-            ★ メイン
-          </button>
-          <button class="absolute top-2 right-2 text-xs px-2 py-1 rounded bg-white/80 border"
-                  @click="removePhoto(p)">
-            削除
-          </button>
-        </div>
-        <div class="p-2 space-y-2">
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" :checked="p.should_blur" @change="toggleBlur(p)" />
-            ぼかし
-          </label>
-          <input type="text" v-model="p.caption" placeholder="キャプション（任意）"
-                 class="w-full border rounded px-2 py-1 text-sm"
-                 @keyup.enter="saveCaption(p)" @blur="saveCaption(p)" />
-        </div>
-      </li>
-    </ul>
+    <!-- アップロード -->
+    <div class="border-t pt-3">
+      <label class="block text-sm font-semibold mb-1">新しい写真を追加</label>
+      <div class="flex items-center gap-2 flex-wrap">
+        <input type="file" multiple @change="onFileChange" class="text-sm" />
+        <label class="flex items-center gap-1 text-sm cursor-pointer">
+          <input type="checkbox" v-model="shouldBlur" />
+          <span>ぼかしを付けて追加</span>
+        </label>
+        <button
+          @click="upload"
+          :disabled="uploading || !newFiles.length"
+          class="px-3 py-1 bg-blue-600 text-white text-sm rounded disabled:opacity-50"
+        >
+          {{ uploading ? "アップロード中..." : "画像をアップロード" }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.blur-sm {
+  filter: blur(4px);
+}
+</style>

@@ -8,7 +8,14 @@ import { onMounted } from "vue" // なくてもOK
 // 連携確認の自動ポーリング
 const polling = ref(false)
 let pollTimer = null
-
+onMounted(async () => {
+  if (!liff.isLoggedIn()) {
+    await liff.login()
+    return // ← この return は関数(onMounted)の中なのでOK
+  }
+  const token = liff.getAccessToken()
+  console.log("LIFF token:", token)
+})
 const pollStatusOnce = async () => {
   try {
     const res = await fetch(urlFor('line.link.status', {}, '/line/link/status') + '?json=1', {
@@ -388,6 +395,12 @@ const linkViaLiff = async () => {
     alert('エラー: ' + (e?.message || e));
   }
 };
+
+await liff.init({ liffId: import.meta.env.VITE_LIFF_ID })
+const token = liff.getAccessToken()
+await axios.post('/api/line/link', { access_token: token })
+alert('LINE連携が完了しました')
+
 </script>
 
 <template>

@@ -62,6 +62,13 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\CastQrController;
 use App\Http\Controllers\Admin\CastPhotoController;
 
+Route::prefix('admin/casts/{cast}/photos')->middleware(['auth'])->group(function () {
+    Route::get('/', [CastPhotoController::class, 'index']);
+    Route::post('/', [CastPhotoController::class, 'store']);
+    Route::put('/reorder', [CastPhotoController::class, 'reorder']);
+    Route::put('/{photo}', [CastPhotoController::class, 'update']);
+    Route::delete('/{photo}', [CastPhotoController::class, 'destroy']);
+});
 Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () {
     // …既存の Casts ルート…
 
