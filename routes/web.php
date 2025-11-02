@@ -62,6 +62,14 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\CastQrController;
 use App\Http\Controllers\Admin\CastPhotoController;
 
+Route::get('/line/liff', fn() => redirect('/cast/profile/edit'));
+
+// routes/web.php
+Route::post('/line/link/direct', [LineLinkController::class, 'direct'])->name('line.link.direct');
+Route::get('/line/liff', function (Illuminate\Http\Request $request) {
+    // LIFF認証後にここへ戻るので、ユーザー用ページへ転送
+    return redirect('/cast/profile/edit');
+});
 Route::prefix('admin/casts/{cast}/photos')->middleware(['auth'])->group(function () {
     Route::get('/', [CastPhotoController::class, 'index']);
     Route::post('/', [CastPhotoController::class, 'store']);
@@ -218,11 +226,12 @@ Route::middleware(['auth','verified','can:admin'])
         ->name('invitations.respond')->middleware('signed');
 });
 
+Route::post('/line/link/direct', [LineLinkController::class, 'direct'])->name('line.link.direct');
+
 /* ▼ LINE 連携（ログイン済み） */
 Route::middleware(['auth'])->group(function () {
     // ProfileEdit のワンタップ連携は必ず auth を通す
-    Route::post('/line/link/direct', [LineLinkController::class, 'direct'])->name('line.link.direct');
-
+    
     Route::post('/line/link/start', [LineLinkController::class, 'start'])->name('line.link.start');
     Route::get ('/line/link/status', [LineLinkController::class,'status'])->name('line.link.status');
     Route::post('/line/push/test',   [LineLinkController::class,'pushTest'])->name('line.push.test');
@@ -425,9 +434,10 @@ Route::middleware(['auth','verified'])->group(function () {
 });
 Route::middleware(['auth','verified'])->group(function () {
     Route::get('/tweets', [TweetController::class,'index'])->name('tweets.index');
-    Route::get('/tweet', [TweetController::class,'index'])->name('tweets.index');
+    //Route::get('/tweet', [TweetController::class,'index'])->name('tweets.index');
     Route::get('/tweets/create', [TweetController::class,'create'])->name('tweets.create');
-    Route::post('/tweets', [TweetController::class,'store'])->name('tweets.store');
+    //Route::post('/tweets', [TweetController::class,'store'])->name('tweets.store');
+    Route::get('/tweets/all', [AnotherController::class, 'index'])->name('tweets.all');
 });
 
 Route::middleware(['auth','verified'])->group(function () {
@@ -473,7 +483,7 @@ Route::get('/age-check', function () {
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/mypage', [CastProfileController::class, 'edit'])->name('cast.profile.edit');
+    Route::get('/mypage', [CastProfileController::class, 'edit']);
 
     Route::get('/cast/profile/edit', [CastProfileController::class, 'edit'])->name('cast.profile.edit');
     Route::post('/cast/profile',      [CastProfileController::class, 'update'])->name('cast.profile.update');

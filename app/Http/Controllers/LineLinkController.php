@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Models\User;
 
+use App\Models\CastProfile;
+
 class LineLinkController extends Controller
 {
     public function direct(Request $request)
@@ -19,7 +21,7 @@ class LineLinkController extends Controller
                 'uid'         => ['required','regex:/^U[0-9a-f]{32}$/i'],
                 'displayName' => ['nullable','string','max:100'],
             ]);
-\Log::info('LINK_DIRECT_IN', ['uid'=>$data['uid'], 'user_id'=>$request->user()->id]);
+            \Log::info('LINK_DIRECT_IN', ['uid'=>$data['uid'], 'user_id'=>$request->user()->id]);
 
             $user  = $request->user();
             $token = config('services.line.channel_access_token');
@@ -45,7 +47,7 @@ class LineLinkController extends Controller
                 'line_display_name' => $displayName,
                 'line_opt_in_at'    => now(),
             ])->save();
-\Log::info('LINK_DIRECT_SAVED', ['user_id'=>$user->id, 'line_user_id'=>$user->fresh()->line_user_id]);
+            \Log::info('LINK_DIRECT_SAVED', ['user_id'=>$user->id, 'line_user_id'=>$user->fresh()->line_user_id]);
             return response()->json(['ok'=>true, 'displayName'=>$displayName, 'uid'=>$data['uid']]);
         }
     public function peek(Request $request)
