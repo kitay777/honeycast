@@ -481,11 +481,11 @@ Route::get('/age-check', function () {
     return inertia('AgeCheck');
 })->name('age.check');
 
-
+Route::get('/cast/profile/edit', [CastProfileController::class, 'edit'])->name('cast.profile.edit');
+    
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/mypage', [CastProfileController::class, 'edit']);
 
-    Route::get('/cast/profile/edit', [CastProfileController::class, 'edit'])->name('cast.profile.edit');
     Route::post('/cast/profile',      [CastProfileController::class, 'update'])->name('cast.profile.update');
 });
 
