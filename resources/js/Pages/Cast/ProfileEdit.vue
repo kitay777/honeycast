@@ -1,5 +1,6 @@
 <!-- resources/js/Pages/Cast/ProfileEdit.vue -->
 <script setup>
+console.log("✅ VITE_LIFF_ID:", import.meta.env.VITE_LIFF_ID);
 import AppLayout from "@/Layouts/AppLayout.vue"
 import { Head, Link, useForm, router, usePage } from "@inertiajs/vue3"
 import { ref, computed, watch, onMounted } from "vue"
