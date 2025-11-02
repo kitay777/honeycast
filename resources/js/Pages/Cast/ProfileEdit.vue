@@ -396,11 +396,12 @@ const linkViaLiff = async () => {
   }
 };
 
+/*
 await liff.init({ liffId: import.meta.env.VITE_LIFF_ID })
 const token = liff.getAccessToken()
 await axios.post('/api/line/link', { access_token: token })
 alert('LINE連携が完了しました')
-
+*/
 </script>
 
 <template>
