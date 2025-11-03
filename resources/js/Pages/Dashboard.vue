@@ -47,6 +47,8 @@ const stop  = () => { if (timer) { clearInterval(timer); timer = null } }
 const handleVisibility = () => { document.hidden ? stop() : start() }
 
 onMounted(() => {
+    console.log('text_banners:', props.text_banners)
+  console.log('visibleTextBanners:', visibleTextBanners.value)
   start()
   document.addEventListener('visibilitychange', handleVisibility, false)
 })
