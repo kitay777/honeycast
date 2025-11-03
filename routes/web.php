@@ -143,8 +143,9 @@ Route::middleware(['auth','verified','can:admin'])
 Route::get('/newbies', [NewbieController::class, 'index'])->name('newbies.index');
 Route::get('/roster', [RosterController::class, 'index'])->name('roster.index');
 Route::get('/shifts', [ShiftController::class, 'index'])->name('shifts.index');
-Route::get('/contact', [ContactController::class, 'index'])->name('contact');
-Route::middleware('auth')->group(function () {
+
+Route::get('/contact', [ContactController::class, 'index'])->name('contact.form');
+Route::post('/contact', [ContactController::class, 'store'])->name('contact.submit');Route::middleware('auth')->group(function () {
     Route::get('/my/likes', [CastLikeController::class, 'index'])->name('likes.index');
     // 既存の like/unlike ルートはそのまま
     // Route::post('/casts/{cast}/like', ...)->name('casts.like');
