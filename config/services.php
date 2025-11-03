@@ -35,14 +35,20 @@ return [
         ],
     ],
     
-    'line' => [
-        'channel_access_token' => env('LINE_CHANNEL_ACCESS_TOKEN'),
-        'channel_secret' => env('LINE_CHANNEL_SECRET'),
-        'friend_url' => env('LINE_BOT_FRIEND_URL'),
-        'friend_qr'  => env('LINE_BOT_QR_URL'),
-        'bot_add_url' => env('LINE_BOT_ADD_URL') ?: env('VITE_LINE_BOT_ADD_URL'),
-        'bot_qr'      => env('LINE_BOT_QR') ?: env('VITE_LINE_BOT_QR'),
-        'liff_id'     => env('VITE_LIFF_ID'),
-    ],
+'line' => [
+    // --- LINEログイン（LIFF） ---
+    'channel_id' => env('LINE_CHANNEL_ID'),
+    'channel_secret' => env('LINE_CHANNEL_SECRET'),
+    'liff_id' => env('VITE_LIFF_ID'),
+
+    // --- Messaging API ---
+    'message_channel_id' => env('LINE_MESSAGE_CHANNEL_ID'),
+    'message_channel_secret' => env('LINE_MESSAGE_CHANNEL_SECRET'),
+    'channel_access_token' => env('LINE_MESSAGE_ACCESS_TOKEN'),
+
+    // --- 共通情報 ---
+    'bot_add_url' => env('LINE_BOT_ADD_URL') ?: env('VITE_LINE_BOT_ADD_URL'),
+    'bot_qr'      => env('LINE_BOT_QR') ?: env('VITE_LINE_BOT_QR'),
+],
 
 ];
