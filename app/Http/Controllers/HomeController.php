@@ -17,10 +17,8 @@ class HomeController extends Controller
         $viewer = $request->user();
 
         // --- キャストなら専用ページへ ---
-        if ($viewer && $viewer->is_cast) {
-            return Inertia::render('/mypage', [
-                'cast' => $viewer->castProfile()->with(['photos'])->first(),
-            ]);
+        if ($viewer && $viewer->castProfile()->exists()) {
+            return redirect('/mypage');
         }
 
         // ==== 以降、運営・一般ユーザー向けの Dashboard ====
