@@ -25,12 +25,10 @@ const props = defineProps({
       { key: 'gifts', label: 'ギフト', to: '/admin/gifts' },
       { key: 'ng', label: 'テロップ', to: '/admin/text-banners' },
       { key: 'ng', label: '広告', to: '/admin/ad-banners' },
-
-
       { key: 'ng', label: '新着情報', to: '/admin/news' },
       { key: 'ng', label: 'イベント', to: '/admin/events' },
-
-      { key: 'ng', label: 'ホテル', to: '/admin/hotels' },
+      { key: 'ng', label: 'ホテル..', to: '/admin/hotels' },
+      { key: 'ng', label: 'System', to: '/admin/system-texts' },
     ]),
   },
 })
