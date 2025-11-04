@@ -61,6 +61,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\CastQrController;
 use App\Http\Controllers\Admin\CastPhotoController;
+//use App\Http\Controllers\AnotherController;
+
+Route::middleware(['auth','verified','can:admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/system-texts', fn() => Inertia::render('Admin/SystemTexts'))->name('system-texts');
+    });
 
 Route::get('/line/liff', fn() => redirect('/cast/profile/edit'));
 
@@ -438,7 +446,7 @@ Route::middleware(['auth','verified'])->group(function () {
     //Route::get('/tweet', [TweetController::class,'index'])->name('tweets.index');
     Route::get('/tweets/create', [TweetController::class,'create'])->name('tweets.create');
     //Route::post('/tweets', [TweetController::class,'store'])->name('tweets.store');
-    Route::get('/tweets/all', [AnotherController::class, 'index'])->name('tweets.all');
+    //Route::get('/tweets/all', [AnotherController::class, 'index'])->name('tweets.all');
 });
 
 Route::middleware(['auth','verified'])->group(function () {
