@@ -76,4 +76,8 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\PointsEntry::class);
     }
+    protected $casts = [
+        'last_login_at' => 'datetime',
+    ];
+
 }

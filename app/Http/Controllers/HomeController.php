@@ -17,15 +17,16 @@ class HomeController extends Controller
         $viewer = $request->user();
 
         // --- キャストなら専用ページへ ---
-if ($viewer && $viewer->is_cast) {
-    return redirect('/mypage');
-}
+        if ($viewer && $viewer->is_cast) {
+            return redirect('/mypage');
+        }
 
         // ==== 以降、運営・一般ユーザー向けの Dashboard ====
         $likedIds = $viewer
             ? DB::table('cast_likes')->where('user_id', $viewer->id)->pluck('cast_profile_id')->all()
             : [];
 
+        // ✅ userもEager Loadして、last_login_atを取り込む
         $toCard = fn(CastProfile $c) => [
             'id'         => $c->id,
             'nickname'   => $c->nickname,
@@ -34,19 +35,22 @@ if ($viewer && $viewer->is_cast) {
             'viewer_has_unblur_access' => false,
             'should_blur'              => false,
             'liked'      => in_array($c->id, $likedIds, true),
+
+            // ✅ 最終ログイン時刻をVueに渡す
+            'last_login_at' => $c->user?->last_login_at
+                ? $c->user->last_login_at->timezone('Asia/Tokyo')->toIso8601String()
+                : null,
         ];
 
-        // ← スコープactiveの調整（先ほどの件）
+        // --- テキストバナー・広告・ニュース ---
         $textBanners = TextBanner::query()
             ->where(function ($q) {
                 $now = now();
-                $q->whereNull('starts_at')
-                    ->orWhere('starts_at', '<=', $now);
+                $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
             })
             ->where(function ($q) {
                 $now = now();
-                $q->whereNull('ends_at')
-                    ->orWhere('ends_at', '>=', $now);
+                $q->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
             })
             ->orderBy('priority', 'desc')
             ->get(['id', 'message', 'url', 'speed', 'bg_color', 'text_color']);
@@ -56,26 +60,15 @@ if ($viewer && $viewer->is_cast) {
 
         // ====== 検索条件 ======
         $f = $request->only([
-            'freeword',
-            'rank_min',
-            'rank_max',
-            'age_min',
-            'age_max',
-            'area',
-            'height_min',
-            'height_max',
-            'cup_min',
-            'cup_max',
-            'style',
-            'alcohol',
-            'mbti',
-            'tags',
+            'freeword','rank_min','rank_max','age_min','age_max',
+            'area','height_min','height_max','cup_min','cup_max',
+            'style','alcohol','mbti','tags',
         ]);
         $hasFilter = collect($f)->filter(fn($v) => is_array($v) ? count(array_filter($v)) : strlen((string)$v) > 0)->isNotEmpty();
 
         $search = [];
         if ($hasFilter) {
-            $q = CastProfile::query();
+            $q = CastProfile::query()->with('user'); // ✅ ← userを読み込む！
 
             if (!empty($f['freeword'])) {
                 $q->where(function ($qq) use ($f) {
@@ -91,7 +84,7 @@ if ($viewer && $viewer->is_cast) {
             if ($f['height_min'] ?? null) $q->where('height_cm', '>=', (int)$f['height_min']);
             if ($f['height_max'] ?? null) $q->where('height_cm', '<=', (int)$f['height_max']);
 
-            $rankCup = fn($c) => array_search(strtoupper($c), ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+            $rankCup = fn($c) => array_search(strtoupper($c), ['A','B','C','D','E','F','G','H']);
             if (!empty($f['cup_min'])) {
                 $cupMin = $rankCup($f['cup_min']);
                 $q->whereRaw("INSTR('ABCDEFGH', UPPER(cup)) - 1 >= ?", [$cupMin]);
@@ -110,17 +103,15 @@ if ($viewer && $viewer->is_cast) {
                 }
             }
 
-            $search = $q->orderByDesc('updated_at')
-                ->take(60)
-                ->get(['id', 'nickname', 'photo_path', 'is_blur_default'])
+            $search = $q->orderByDesc('updated_at')->take(60)->get(['id','nickname','photo_path','is_blur_default'])
                 ->map($toCard)->values()->all();
         }
 
-        // ====== ダッシュボード用 ======
-        $today   = CastProfile::select('id', 'nickname', 'photo_path', 'is_blur_default')->latest('updated_at')->take(9)->get()->map($toCard)->values()->all();
-        $login   = CastProfile::select('id', 'nickname', 'photo_path', 'is_blur_default')->latest('updated_at')->take(9)->get()->map($toCard)->values()->all();
-        $newbies = CastProfile::select('id', 'nickname', 'photo_path', 'is_blur_default')->latest('created_at')->take(9)->get()->map($toCard)->values()->all();
-        $roster  = CastProfile::select('id', 'nickname', 'photo_path', 'is_blur_default')->orderBy('nickname')->take(9)->get()->map($toCard)->values()->all();
+        // ====== ダッシュボード用（すべて user リレーション付き） ======
+        $today   = CastProfile::with('user')->latest('updated_at')->take(9)->get()->map($toCard)->values()->all();
+        $login   = CastProfile::with('user')->latest('updated_at')->take(9)->get()->map($toCard)->values()->all();
+        $newbies = CastProfile::with('user')->latest('created_at')->take(9)->get()->map($toCard)->values()->all();
+        $roster  = CastProfile::with('user')->orderBy('nickname')->take(9)->get()->map($toCard)->values()->all();
 
         return Inertia::render('Dashboard', [
             'search_applied' => $hasFilter,

@@ -29,6 +29,13 @@ class CastController extends Controller
     public function show(CastProfile $cast)
     {
         // ===== 直近1週間スケジュール =====
+        $cast->load('user');
+        \Log::info('Cast debug', [
+            'cast_id' => $cast->id,
+            'user_id' => $cast->user_id,
+            'user_exists' => !!$cast->user,
+            'last_login_at' => $cast->user?->last_login_at,
+        ]);
         $today = Carbon::today();
         $days  = collect(range(0, 6))->map(function ($i) use ($cast, $today) {
             $d = $today->copy()->addDays($i)->toDateString();
@@ -36,7 +43,7 @@ class CastController extends Controller
                 ->whereDate('date', $d)
                 ->orderBy('start_time')
                 ->get(['start_time', 'end_time'])
-                ->map(fn ($s) => [
+                ->map(fn($s) => [
                     'start' => substr($s->start_time, 0, 5),
                     'end'   => substr($s->end_time,   0, 5),
                 ]);
@@ -58,21 +65,21 @@ class CastController extends Controller
 
         // 写真の取得
         $photosRaw = $cast->photos()->orderBy('sort_order')
-            ->get(['id','path','sort_order','is_primary','should_blur']);
+            ->get(['id', 'path', 'sort_order', 'is_primary', 'should_blur']);
 
         // 個別許可（viewer_id / user_id どちらでも対応）
         $approvedMap = [];
         $pendingMap  = [];
         if ($viewer && $photosRaw->isNotEmpty()) {
             $photoIds = $photosRaw->pluck('id')->all();
-            $viewerCol = Schema::hasColumn('cast_photo_view_permissions','viewer_id') ? 'viewer_id'
-                       : (Schema::hasColumn('cast_photo_view_permissions','user_id') ? 'user_id' : null);
+            $viewerCol = Schema::hasColumn('cast_photo_view_permissions', 'viewer_id') ? 'viewer_id'
+                : (Schema::hasColumn('cast_photo_view_permissions', 'user_id') ? 'user_id' : null);
 
             $permsQ = CastPhotoViewPermission::whereIn('cast_photo_id', $photoIds);
             if ($viewerCol) {
                 $permsQ->where($viewerCol, $viewer->id);
             }
-            $perms = $permsQ->orderByDesc('id')->get(['cast_photo_id','status']);
+            $perms = $permsQ->orderByDesc('id')->get(['cast_photo_id', 'status']);
 
             foreach ($perms as $perm) {
                 $pid = $perm->cast_photo_id;
@@ -110,7 +117,7 @@ class CastController extends Controller
 
         // 後方互換: photo_path（旧UI用）
         $primary = $cast->photos()->where('is_primary', true)->first()
-                 ?? $cast->photos()->orderBy('sort_order')->first();
+            ?? $cast->photos()->orderBy('sort_order')->first();
         $photoPath = $primary?->path;
 
         // タグ配列化（文字列/配列両対応）
@@ -122,7 +129,7 @@ class CastController extends Controller
 
         // ===== ギフト（Show.vue用のprops） =====
         $gifts = Gift::active()
-            ->get(['id','name','image_path','present_points','cast_points'])
+            ->get(['id', 'name', 'image_path', 'present_points', 'cast_points'])
             ->map(fn($g) => [
                 'id'              => $g->id,
                 'name'            => $g->name,
@@ -157,15 +164,15 @@ class CastController extends Controller
                 'tags'       => $tags,
                 'freeword'   => $cast->freeword,
 
-                'photo_path' => $photoPath,   // 後方互換
-                'photos'     => $photos,      // Show.vue はこの配列を参照
+                'photo_path' => $photoPath,
+                'photos'     => $photos,
                 'viewer_has_unblur_access' => (bool) $viewerHasAccess,
+
+                // ✅ 追加：ユーザーの最終ログイン時間を渡す
+                'last_login_at' => $cast->user?->last_login_at,
             ],
 
-            // スケジュール（Show.vue 側は 'schedule' を参照）
             'schedule'     => $days,
-
-            // ギフト送付用 props（Show.vue 側で使用）
             'gifts'        => $gifts,
             'my_balance'   => $myBalance,
             'last_gift_id' => $lastGiftId,
@@ -183,7 +190,7 @@ class CastController extends Controller
             $slots = $cast->shifts()->whereDate('date', $d)
                 ->orderBy('start_time')
                 ->get(['start_time', 'end_time'])
-                ->map(fn ($s) => [
+                ->map(fn($s) => [
                     'start' => substr($s->start_time, 0, 5),
                     'end'   => substr($s->end_time,   0, 5),
                 ]);

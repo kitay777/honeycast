@@ -50,16 +50,19 @@ public function store(Request $request)
     }
 
     \Illuminate\Support\Facades\Auth::login($user, $request->boolean('remember'));
+
+    // ✅ ログイン時刻を確実に更新
+    $user->forceFill(['last_login_at' => now()])->save();
+
     $request->session()->regenerate(true);
 
-    // ★ ここがポイント：Inertiaリクエストなら「確実な遷移」を指示
     if ($request->header('X-Inertia')) {
-        return Inertia::location(route('dashboard')); // ← ブラウザにハードリダイレクトを指示
+        return \Inertia\Inertia::location(route('dashboard'));
     }
 
-    // 通常のフォームでもOKなようにフォールバック
-    return redirect()->intended(route('dashboard', absolute:false))->setStatusCode(303);
+    return redirect()->intended(route('dashboard', absolute: false))->setStatusCode(303);
 }
+
 
     /**
      * Destroy an authenticated session.
