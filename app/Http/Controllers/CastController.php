@@ -127,6 +127,7 @@ class CastController extends Controller
                 ->values()->all();
         }
 
+        
         // ===== ギフト（Show.vue用のprops） =====
         $gifts = Gift::active()
             ->get(['id', 'name', 'image_path', 'present_points', 'cast_points'])

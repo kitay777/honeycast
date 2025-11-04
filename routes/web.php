@@ -105,13 +105,14 @@ Route::get('/session-probe', function (\Illuminate\Http\Request $r) {
     return response()->noContent();
 });
 
+/*
 Route::middleware(['auth','verified'])->group(function () {
     // 送った（ユーザー視点）
     Route::get('/my/gifts',   [GiftSendController::class, 'mySends'])->name('gifts.my');
     // もらった（キャスト本人視点 = ログイン済みユーザーに cast_profile が紐づく想定）
     Route::get('/cast/gifts', [GiftSendController::class, 'castReceives'])->name('gifts.cast');
 });
-
+*/
 Route::middleware(['auth','verified'])->group(function () {
     Route::post('/gifts/send', [GiftSendController::class, 'store'])->name('gifts.send');
     Route::get('/my/gifts',    [GiftSendController::class, 'mySends'])->name('gifts.my');
