@@ -29,6 +29,8 @@ const props = defineProps({
       { key: 'ng', label: 'イベント', to: '/admin/events' },
       { key: 'ng', label: 'ホテル..', to: '/admin/hotels' },
       { key: 'ng', label: 'System', to: '/admin/system-texts' },
+      { key: 'ng', label: 'System', to: '/admin/system-texts' },
+      { key: 'ng', label: 'クーポン', to: '/admin/coupons' }
     ]),
   },
 })
