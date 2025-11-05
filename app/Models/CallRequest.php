@@ -35,6 +35,10 @@ class CallRequest extends Model
             ->withTimestamps()
             ->withPivot(['status','note','assigned_by']);
     }
+    public function coupon()
+    {
+        return $this->belongsTo(Coupon::class);
+    }
 }
 
 

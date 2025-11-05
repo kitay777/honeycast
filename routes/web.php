@@ -62,6 +62,11 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\CastQrController;
 use App\Http\Controllers\Admin\CastPhotoController;
 //use App\Http\Controllers\AnotherController;
+Route::middleware(['auth','verified','can:admin'])
+    ->prefix('admin')->name('admin.')
+    ->group(function () {
+        Route::resource('coupons', \App\Http\Controllers\Admin\CouponController::class);
+    });
 
 Route::middleware(['auth','verified','can:admin'])
     ->prefix('admin')

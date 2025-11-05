@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             TrustProxies::class,
             HandleInertiaRequests::class,
         ]);
+
         $middleware->alias([
             'guest.or.admin' => AllowGuestOrAdmin::class,
         ]);
@@ -30,8 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })
+    // ✅ Laravel 12 の正しいイベント登録方法
     ->withEvents([
-        \Illuminate\Auth\Events\Login::class => [
-            \App\Listeners\UpdateLastLoginAt::class,
-        ],
-    ])->create();
+        __DIR__.'/../app/Listeners',  // ここをスキャンして自動検出
+    ])
+    ->create();

@@ -3,7 +3,8 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import { useForm } from '@inertiajs/vue3'
 
 const props = defineProps({
-  defaults: { type: Object, default: () => ({}) }
+  defaults: { type: Object, default: () => ({}) },
+  coupons: { type: Array, default: () => [] },
 })
 
 const form = useForm({
@@ -17,6 +18,7 @@ const form = useForm({
   set_plan:    '',
   game_option: '',
   note:        '',
+  coupon_id: null, 
 })
 
 const submit = () => form.post(route('call.store'))
@@ -97,6 +99,21 @@ const submit = () => form.post(route('call.store'))
           <label class="col-span-2 text-lg">備考</label>
           <textarea v-model="form.note" rows="3" class="col-span-3 rounded px-3 py-2 text-black" placeholder="要望や集合場所の詳細など"></textarea>
         </div>
+<!-- クーポン選択 -->
+<div>
+  <label class="block text-lg mb-2">クーポンを使用する（任意）</label>
+  <div class="grid sm:grid-cols-3 gap-4">
+    <label v-for="c in props.coupons" :key="c.id"
+           class="block border rounded-lg p-3 bg-white/80 text-black cursor-pointer hover:ring-2 hover:ring-yellow-400">
+      <input type="radio" name="coupon" :value="c.id" v-model="form.coupon_id" class="mr-2" />
+      <div class="flex flex-col items-center">
+        <img :src="c.image_url" alt="" class="w-24 h-24 object-contain mb-2" />
+        <div class="font-semibold">{{ c.name }}</div>
+        <div class="text-sm text-gray-600">＋{{ c.points }}pt</div>
+      </div>
+    </label>
+  </div>
+</div>
 
         <div class="pt-2 flex justify-center">
           <button :disabled="form.processing"
