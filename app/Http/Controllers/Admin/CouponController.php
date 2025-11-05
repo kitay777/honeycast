@@ -35,31 +35,28 @@ class CouponController extends Controller
         return Inertia::render('Admin/Coupons/Create');
     }
 
-
-    /** 保存 */
     public function store(Request $request)
-    {
-        // 既存のバリデーション・保存処理
-        $data = $request->validate([
-            'place' => 'required|string|max:255',
-            'cast_count' => 'required|integer|min:1',
-            'guest_count' => 'required|integer|min:1',
-            'nomination' => 'nullable|string|max:255',
-            'date' => 'required|date',
-            'start_time' => 'required|string',
-            'end_time' => 'required|string',
-            'set_plan' => 'nullable|string|max:50',
-            'game_option' => 'nullable|string|max:100',
-            'note' => 'nullable|string|max:500',
-            'coupon_id' => 'nullable|exists:coupons,id', // ✅ 追加
-        ]);
+{
+    $data = $request->validate([
+        'code' => 'required|string|max:50|unique:coupons,code',
+        'name' => 'required|string|max:100',
+        'discount_points' => 'required|integer|min:1',
+        'max_uses' => 'nullable|integer|min:1',
+        'expires_at' => 'nullable|date',
+        'active' => 'boolean',
+        'image' => 'nullable|image|max:2048',
+    ]);
 
-        $data['user_id'] = auth()->id();
-
-        \App\Models\CallRequest::create($data);
-
-        return redirect()->route('dashboard')->with('success', '呼び出しを送信しました！');
+    if ($request->hasFile('image')) {
+        $data['image_path'] = $request->file('image')->store('coupons', 'public');
     }
+
+    Coupon::create($data);
+
+    return redirect()
+        ->route('admin.coupons.index')
+        ->with('success', 'クーポンを作成しました。');
+}
 
     /** 編集画面 */
     public function edit(Coupon $coupon)
