@@ -29,30 +29,12 @@ class CouponController extends Controller
         ]);
     }
 
-    /** 新規作成フォーム */
+        /** 新規作成フォーム */
     public function create()
     {
-        // ✅ 有効なクーポンだけ取得
-        $coupons = Coupon::query()
-            ->where('active', true)
-            ->where(function ($q) {
-                $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
-            })
-            ->orderByDesc('id')
-            ->get(['id', 'name', 'discount_points', 'image_path'])
-            ->map(fn($c) => [
-                'id' => $c->id,
-                'name' => $c->name,
-                'points' => $c->discount_points,
-                'image_url' => $c->image_path
-                    ? asset('storage/' . $c->image_path)
-                    : '/assets/imgs/placeholder.png',
-            ]);
-
-        return Inertia::render('Call/Create', [
-            'coupons' => $coupons, // ← ★ これが Vue 側の props.coupons に対応
-        ]);
+        return Inertia::render('Admin/Coupons/Create');
     }
+
 
     /** 保存 */
     public function store(Request $request)
