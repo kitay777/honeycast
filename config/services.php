@@ -40,7 +40,7 @@ return [
     'channel_id' => env('LINE_CHANNEL_ID'),
     'channel_secret' => env('LINE_CHANNEL_SECRET'),
     'liff_id' => env('VITE_LIFF_ID'),
-
+    'redirect'       => env('LINE_REDIRECT_URI'),
     // --- Messaging API ---
     'message_channel_id' => env('LINE_MESSAGE_CHANNEL_ID'),
     'message_channel_secret' => env('LINE_MESSAGE_CHANNEL_SECRET'),

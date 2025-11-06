@@ -62,6 +62,10 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\CastQrController;
 use App\Http\Controllers\Admin\CastPhotoController;
 //use App\Http\Controllers\AnotherController;
+use App\Http\Controllers\LineController;
+
+Route::get('/line/callback', [LineController::class, 'callback'])->name('line.callback');
+Route::post('/line/unlink', [LineController::class, 'unlink'])->name('line.unlink');
 Route::middleware(['auth','verified','can:admin'])
     ->prefix('admin')->name('admin.')
     ->group(function () {
