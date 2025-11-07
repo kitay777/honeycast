@@ -7,6 +7,7 @@ use App\Models\CallRequest;
 use App\Models\CallRequestCast;
 use App\Models\CastProfile;
 use App\Models\CastShift;
+use App\Models\Coupon;
 use App\Notifications\CallRequestInvited;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,27 +18,39 @@ use Inertia\Inertia;
 class CallRequestController extends Controller
 {
     /** 一覧＋詳細（候補リスト付き） */
+    // ...
     public function index(Request $request)
     {
-        $status = $request->string('status')->toString();   // pending/assigned/closed など
-        $date   = $request->string('date')->toString();     // YYYY-MM or YYYY-MM-DD
+        $status = $request->string('status')->toString();
+        $date   = $request->string('date')->toString();
         $selId  = $request->integer('selected_id') ?: null;
 
-        $q = CallRequest::with(['user:id,name,email'])
-            ->when($status !== '', fn ($x) => $x->where('status', $status))
+        // ✅ JOINして一覧にもクーポン名/コードを含める
+        $q = CallRequest::query()
+            ->with(['user:id,name,email'])
+            ->leftJoin('coupons', 'call_requests.coupon_id', '=', 'coupons.id')
+            ->select([
+                'call_requests.*',
+                'coupons.name as coupon_name',
+                'coupons.code as coupon_code',
+                'coupons.discount_points as coupon_discount',
+            ])
+            ->when($status !== '', fn($x) => $x->where('call_requests.status', $status))
             ->when($date !== '', function ($x) use ($date) {
-                if (strlen($date) === 7) { // YYYY-MM
-                    $x->where('date', '>=', "$date-01")->where('date', '<=', "$date-31");
+                if (strlen($date) === 7) {
+                    $x->where('call_requests.date', '>=', "$date-01")
+                        ->where('call_requests.date', '<=', "$date-31");
                 } else {
-                    $x->where('date', $date);
+                    $x->where('call_requests.date', $date);
                 }
             })
-            ->orderByDesc('id')
+            ->orderByDesc('call_requests.id')
             ->paginate(30)
             ->withQueryString();
 
         $selected   = null;
         $candidates = [];
+        $coupons    = collect();
 
         if ($selId) {
             $selected = CallRequest::with([
@@ -47,7 +60,7 @@ class CallRequestController extends Controller
             ])->find($selId);
 
             if ($selected) {
-                // 同日・時間内で空きのあるシフトから候補キャストを抽出
+                // 候補キャスト
                 $candidates = CastShift::with(['castProfile:id,user_id,nickname', 'castProfile.user:id,name,email'])
                     ->where('date', $selected->date)
                     ->where('start_time', '<=', $selected->start_time)
@@ -55,30 +68,37 @@ class CallRequestController extends Controller
                     ->where('is_reserved', false)
                     ->orderBy('cast_profile_id')
                     ->get()
-                    ->map(function ($s) {
-                        $nick = $s->castProfile->nickname;
-                        return [
-                            'id'    => $s->cast_profile_id,
-                            // ★ ユーザー名で補完しない（キャストのニックネームのみ）
-                            'label' => ($nick && $nick !== '') ? $nick : '(無名)#' . $s->cast_profile_id,
-                            'email' => optional($s->castProfile->user)->email,
-                        ];
-                    })
+                    ->map(fn($s) => [
+                        'id'    => $s->cast_profile_id,
+                        'label' => $s->castProfile->nickname ?: '(無名)#' . $s->cast_profile_id,
+                        'email' => optional($s->castProfile->user)->email,
+                    ])
                     ->unique('id')
                     ->values();
+
+                // ✅ このリクエストに紐づくクーポン詳細
+                if ($selected->coupon_id) {
+                    $coupon = \App\Models\Coupon::query()
+                        ->where('id', $selected->coupon_id)
+                        ->first(['id', 'name', 'code', 'discount_points as discount', 'expires_at']);
+
+                    if ($coupon) {
+                        $coupons = collect([$coupon]);
+                    }
+                }
             }
         }
 
-        // 手動割当用のキャスト一覧（最大200件）
+        // 全キャストリスト
         $allCasts = CastProfile::with('user:id,name,email')
             ->orderByDesc('id')
             ->limit(200)
             ->get(['id', 'user_id', 'nickname'])
-            ->map(fn ($c) => [
+            ->map(fn($c) => [
                 'id'      => $c->id,
                 'user_id' => $c->user_id,
-                'label'   => ($c->nickname && $c->nickname !== '') ? $c->nickname : '(無名)#' . $c->id,
-                'nickname'=> $c->nickname,
+                'label'   => $c->nickname ?: '(無名)#' . $c->id,
+                'nickname' => $c->nickname,
                 'email'   => optional($c->user)->email,
             ]);
 
@@ -87,9 +107,11 @@ class CallRequestController extends Controller
             'selected'   => $selected,
             'candidates' => $candidates,
             'casts'      => $allCasts,
+            'coupons'    => $coupons,
             'filters'    => ['status' => $status, 'date' => $date, 'selected_id' => $selId],
         ]);
     }
+
 
     /** 割当（招待）＋ LINE 通知（Quick Reply: 参加/辞退） */
     public function assign(Request $request, CallRequest $req)
@@ -207,13 +229,17 @@ class CallRequestController extends Controller
                         Log::info('LINE push ok', ['req_id' => $push['req_id'], 'to_user' => $push['user_id']]);
                     } else {
                         Log::warning('LINE push failed', [
-                            'req_id' => $push['req_id'], 'to_user' => $push['user_id'],
-                            'status' => $res->status(), 'body' => $res->body(),
+                            'req_id' => $push['req_id'],
+                            'to_user' => $push['user_id'],
+                            'status' => $res->status(),
+                            'body' => $res->body(),
                         ]);
                     }
                 } catch (\Throwable $e) {
                     Log::error('LINE push exception', [
-                        'req_id' => $push['req_id'], 'to_user' => $push['user_id'], 'ex' => $e->getMessage(),
+                        'req_id' => $push['req_id'],
+                        'to_user' => $push['user_id'],
+                        'ex' => $e->getMessage(),
                     ]);
                 }
             });
