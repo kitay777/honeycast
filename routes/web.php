@@ -66,6 +66,13 @@ use App\Http\Controllers\LineController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\CallMatchController;
 
+Route::middleware(['auth'])->group(function () {
+    Route::get('/mypage/account', [\App\Http\Controllers\MyAccountController::class, 'edit'])
+        ->name('account.edit');
+
+    Route::post('/mypage/account', [\App\Http\Controllers\MyAccountController::class, 'update'])
+        ->name('account.update');
+});
 Route::middleware(['auth','verified','can:admin'])
     ->prefix('admin')->name('admin.')
     ->group(function () {

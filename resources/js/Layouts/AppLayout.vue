@@ -303,6 +303,12 @@ onBeforeUnmount(() => {
                 >
                     RECRUIT
                 </Link>
+                <Link
+                    href="/mypage/account"
+                    class="block px-5 py-4 hover:bg-white/10"
+                    @click="closeMenu"
+                    >アカウント</Link
+                >
 
 <template v-if="isCast">
                 <Link
