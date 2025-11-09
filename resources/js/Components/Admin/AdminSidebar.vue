@@ -30,7 +30,8 @@ const props = defineProps({
       { key: 'ng', label: 'ホテル..', to: '/admin/hotels' },
       { key: 'ng', label: 'System', to: '/admin/system-texts' },
       { key: 'ng', label: 'System', to: '/admin/system-texts' },
-      { key: 'ng', label: 'クーポン', to: '/admin/coupons' }
+      { key: 'ng', label: 'クーポン', to: '/admin/coupons' },
+      { key: 'ng', label: 'コール履歴', to: '/admin/call-matches' },
     ]),
   },
 })

@@ -66,6 +66,15 @@ use App\Http\Controllers\LineController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\CallMatchController;
 
+Route::middleware(['auth','verified','can:admin'])
+    ->prefix('admin')->name('admin.')
+    ->group(function () {
+        Route::get('/call-matches', [\App\Http\Controllers\Admin\CallMatchController::class, 'index'])
+            ->name('call-matches.index');
+        Route::get('/call-matches/{match}', [\App\Http\Controllers\Admin\CallMatchController::class, 'show'])
+            ->name('call-matches.show');
+    });
+    
 Route::middleware(['auth'])->group(function () {
     // キャストから管理者LINEへメッセージ送信
     Route::post('/cast/line/send', [\App\Http\Controllers\CallMatchController::class, 'sendLineFromCast'])
