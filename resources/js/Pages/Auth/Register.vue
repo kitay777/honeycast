@@ -15,28 +15,24 @@ const submit = () => {
 }
 
 const goBack = () => {
-  router.visit('/') // もしくは router.back()
+  router.visit('/')
 }
 </script>
 
 <template>
   <Head title="新規登録" />
 
-  <!-- 画面全体 -->
   <div class="min-h-dvh w-screen flex items-center justify-center bg-black">
-    <!-- iPhone縦長っぽいキャンバス（PCでも見やすく） -->
     <div
       class="relative w-full h-dvh md:w-[390px] md:h-[844px] mx-auto
              bg-no-repeat bg-center bg-[length:100%_100%] overflow-y-auto"
       style="background-image: url('/assets/imgs/back.png');"
     >
-      <!-- 内容 -->
       <div class="px-8 pt-20 pb-12 text-white/90">
         <h1 class="text-2xl font-semibold tracking-wider mb-10">
           ご登録情報をご入力下さい。
         </h1>
 
-        <!-- ラベル＋入力 -->
         <form @submit.prevent="submit" class="space-y-7">
           <!-- 名前 -->
           <div>
@@ -73,11 +69,12 @@ const goBack = () => {
 
           <!-- 電話番号 -->
           <div>
-            <label class="block mb-2 text-sm">電話番号</label>
+            <label class="block mb-2 text-sm">電話番号（メールの代わりでもOK）</label>
             <input
               v-model="form.phone"
               type="tel"
               inputmode="tel"
+              placeholder="09012345678"
               class="w-full h-12 rounded-md bg-white text-black px-3
                      outline-none ring-2 ring-[#ff9e4a] ring-offset-2 focus:ring-[#ffba6a]"
             />
@@ -86,11 +83,11 @@ const goBack = () => {
 
           <!-- メール -->
           <div>
-            <label class="block mb-2 text-sm">メールアドレス</label>
+            <label class="block mb-2 text-sm">メールアドレス（電話の代わりでもOK）</label>
             <input
               v-model="form.email"
               type="email"
-              required
+              placeholder="test@example.com"
               class="w-full h-12 rounded-md bg-white text-black px-3
                      outline-none ring-2 ring-[#ff9e4a] ring-offset-2 focus:ring-[#ffba6a]"
             />
@@ -104,6 +101,7 @@ const goBack = () => {
               v-model="form.password"
               type="password"
               required
+              minlength="6"
               class="w-full h-12 rounded-md bg-white text-black px-3
                      outline-none ring-2 ring-[#ff9e4a] ring-offset-2 focus:ring-[#ffba6a]"
             />
@@ -111,11 +109,21 @@ const goBack = () => {
           </div>
 
           <!-- 確認 -->
-          <input v-model="form.password_confirmation" type="password" class="hidden" />
-
-          <!-- ボタンたち -->
+          <div>
+  <label class="block mb-2 text-sm">パスワード（確認）</label>
+  <input
+    v-model="form.password_confirmation"
+    type="password"
+    required
+    class="w-full h-12 rounded-md bg-white text-black px-3
+           outline-none ring-2 ring-[#ff9e4a] ring-offset-2 focus:ring-[#ffba6a]"
+  />
+  <div v-if="form.errors.password_confirmation" class="mt-1 text-xs text-red-300">
+    {{ form.errors.password_confirmation }}
+  </div>
+</div>
+          <!-- ボタン -->
           <div class="mt-6 space-y-4">
-            <!-- 登録 -->
             <button
               type="submit"
               :disabled="form.processing"
@@ -126,7 +134,6 @@ const goBack = () => {
               登　録
             </button>
 
-            <!-- 戻る -->
             <button
               type="button"
               @click="goBack"

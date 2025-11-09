@@ -3,18 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\User;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Hash;
-
-
 
 class AuthenticatedSessionController extends Controller
 {
@@ -32,49 +28,66 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-public function store(Request $request)
-{
-    $request->validate([
-        'email'    => ['required', 'string', 'email'],
-        'password' => ['required', 'string'],
-    ]);
-
-    $email = mb_strtolower(trim((string)$request->input('email')));
-    $password = (string)$request->input('password');
-
-    $user = \App\Models\User::where('email', $email)->first();
-    if (!$user || !\Illuminate\Support\Facades\Hash::check($password, $user->password)) {
-        throw \Illuminate\Validation\ValidationException::withMessages([
-            'email' => __('auth.failed'),
+    public function store(Request $request)
+    {
+        // ✅ 入力欄は共通（login）
+        $request->validate([
+            'login'    => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string'],
         ]);
+
+        $login = trim((string)$request->input('login'));
+        $password = (string)$request->input('password');
+
+        // ✅ 入力がメールアドレス形式か電話番号形式か判定
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            // 📧 メールログイン
+            $user = User::whereRaw('LOWER(email) = ?', [mb_strtolower($login)])->first();
+        } elseif (preg_match('/^[0-9]{10,11}$/', $login)) {
+            // 📱 電話番号ログイン（ハイフン除去済み想定）
+            $user = User::where('phone', $login)->first();
+        } else {
+            // どちらでもない形式
+            throw ValidationException::withMessages([
+                'login' => '正しいメールアドレスまたは電話番号を入力してください。',
+            ]);
+        }
+
+        // ✅ 認証チェック
+        if (!$user || !Hash::check($password, $user->password)) {
+            throw ValidationException::withMessages([
+                'login' => __('auth.failed'),
+            ]);
+        }
+
+        // ✅ ログイン処理
+        Auth::login($user, $request->boolean('remember'));
+
+        // ✅ ログイン時刻更新
+        $user->forceFill(['last_login_at' => now()])->save();
+
+        // ✅ セッション再生成
+        $request->session()->regenerate(true);
+
+        // ✅ Inertia対応
+        if ($request->header('X-Inertia')) {
+            return Inertia::location(route('dashboard'));
+        }
+
+        return redirect()->intended(route('dashboard', absolute: false))->setStatusCode(303);
     }
-
-    \Illuminate\Support\Facades\Auth::login($user, $request->boolean('remember'));
-
-    // ✅ ログイン時刻を確実に更新
-    $user->forceFill(['last_login_at' => now()])->save();
-
-    $request->session()->regenerate(true);
-
-    if ($request->header('X-Inertia')) {
-        return \Inertia\Inertia::location(route('dashboard'));
-    }
-
-    return redirect()->intended(route('dashboard', absolute: false))->setStatusCode(303);
-}
-
 
     /**
      * Destroy an authenticated session.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request)
     {
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
-
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        // 🚀 フルリロードでCSRFを新規取得
+        return Inertia::location(url('/'));
     }
 }
