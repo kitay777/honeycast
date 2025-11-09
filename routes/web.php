@@ -66,6 +66,11 @@ use App\Http\Controllers\LineController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\CallMatchController;
 
+Route::middleware(['auth'])->group(function () {
+    // キャストから管理者LINEへメッセージ送信
+    Route::post('/cast/line/send', [\App\Http\Controllers\CallMatchController::class, 'sendLineFromCast'])
+        ->name('cast.line.send');
+});
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/cast/match', [CallMatchController::class, 'showStartPage'])->name('matches.page');

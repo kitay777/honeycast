@@ -18,6 +18,7 @@ class CastController extends Controller
 
         $casts = CastProfile::with('user:id,name,email,area')
             // ← 検索は括弧でグルーピングして or の漏れを防止
+            ->with('user')
             ->when($q, function ($query) use ($q) {
                 $query->where(function ($w) use ($q) {
                     $w->where('nickname', 'like', "%{$q}%")

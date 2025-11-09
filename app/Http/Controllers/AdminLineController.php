@@ -23,52 +23,36 @@ class AdminLineController extends Controller
     }
 
     /** 個別送信 */
+    /** 管理者がユーザーにLINEメッセージを送信 */
     public function push(Request $request, User $user)
     {
         $data = $request->validate([
-            'text' => ['required','string','max:1000'],
-            'notification_disabled' => ['sometimes','boolean'],
+            'text' => ['required', 'string', 'max:1000'],
+            'notification_disabled' => ['boolean'],
         ]);
 
+        // ✅ LINEユーザーIDを取得（usersテーブルに line_user_id カラムがある前提）
         if (!$user->line_user_id) {
-            return back()->with('error', 'このユーザーはLINE未連携です。');
-        }
-
-        $token = config('services.line.channel_access_token');
-        if (!$token) {
-            return back()->with('error', 'LINE_CHANNEL_ACCESS_TOKEN が未設定です。');
-        }
-
-        // 改行/空白整形（CRLF→LF、前後trim）
-        $text = preg_replace("/\r\n?/", "\n", trim($data['text']));
-
-        $payload = [
-            'to' => $user->line_user_id,
-            'messages' => [[ 'type' => 'text', 'text' => $text ]],
-        ];
-        if (!empty($data['notification_disabled'])) {
-            $payload['notificationDisabled'] = true;
+            return back()->with('error', 'このユーザーはLINE連携がされていません。');
         }
 
         try {
-            $res = Http::withToken($token)
-                ->asJson()
-                ->post(self::PUSH_ENDPOINT, $payload);
+            $token = config('services.line.channel_access_token');
 
-            if ($res->successful()) {
-                Log::info('LINE push ok', ['to'=>$user->id, 'len'=>mb_strlen($text)]);
-                return back()->with('success', '送信しました。');
-            }
+            // ✅ LINE Bot へ送信
+            Http::withToken($token)->post('https://api.line.me/v2/bot/message/push', [
+                'to' => $user->line_user_id,
+                'messages' => [[
+                    'type' => 'text',
+                    'text' => $data['text'],
+                ]],
+                'notificationDisabled' => (bool)($data['notification_disabled'] ?? false),
+            ]);
 
-            // 429の簡易リトライ案内
-            $retryAfter = $res->header('Retry-After');
-            $hint = $retryAfter ? " / Retry-After: {$retryAfter}s" : '';
-            Log::warning('LINE push failed', ['status'=>$res->status(), 'body'=>$res->body(), 'to'=>$user->id]);
-
-            return back()->with('error', "送信失敗 ({$res->status()}): ".$res->body().$hint);
-        } catch (ConnectionException $e) {
-            Log::error('LINE push connection error', ['ex'=>$e->getMessage()]);
-            return back()->with('error', '送信失敗: ネットワークエラー');
+            return back()->with('success', 'LINEメッセージを送信しました。');
+        } catch (\Throwable $e) {
+            Log::error('LINE送信エラー: '.$e->getMessage());
+            return back()->with('error', 'LINE送信に失敗しました。');
         }
     }
 

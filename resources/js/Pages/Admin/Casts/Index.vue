@@ -476,28 +476,27 @@ async function submitPoints() {
                             class="w-full border rounded px-3 py-2"
                         />
                     </div>
-<div class="col-span-12 md:col-span-4">
-  <label class="text-sm">指名料（円）</label>
-  <input
-    v-model.number="form.nomination_fee"
-    type="number"
-    min="0"
-    class="w-full border rounded px-3 py-2 text-right"
-    placeholder="例: 5000"
-  />
-</div>
-<div class="col-span-12 md:col-span-4">
-  <label class="text-sm">評価（1〜5）</label>
-  <input
-    v-model.number="form.rating"
-    type="number"
-    min="1"
-    max="5"
-    class="w-full border rounded px-3 py-2 text-right"
-    placeholder="例: 4"
-  />
-</div>
-
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="text-sm">指名料（円）</label>
+                        <input
+                            v-model.number="form.nomination_fee"
+                            type="number"
+                            min="0"
+                            class="w-full border rounded px-3 py-2 text-right"
+                            placeholder="例: 5000"
+                        />
+                    </div>
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="text-sm">評価（1〜5）</label>
+                        <input
+                            v-model.number="form.rating"
+                            type="number"
+                            min="1"
+                            max="5"
+                            class="w-full border rounded px-3 py-2 text-right"
+                            placeholder="例: 4"
+                        />
+                    </div>
 
                     <div class="col-span-12">
                         <label class="text-sm">タグ（カンマ区切り）</label>
@@ -542,6 +541,70 @@ async function submitPoints() {
                         写真（メイン／サブ）
                     </h3>
                     <CastPhotosManager :cast-id="form.id" />
+                </div>
+                <!-- ✅ LINEメッセージ送信欄 -->
+                <div
+                    v-if="form.id && selectedCast?.user?.line_user_id"
+                    id="line-send-box"
+                    class="mt-6 bg-white rounded-2xl shadow p-4"
+                >
+                    <h3 class="text-lg font-semibold mb-2">
+                        LINEメッセージ送信
+                    </h3>
+                    <div class="text-sm text-gray-600 mb-2">
+                        宛先:
+                        <span class="font-semibold">{{
+                            selectedCast.user.name || selectedCast.user.email
+                        }}</span>
+                        <span class="text-gray-400 ml-1"
+                            >（ID: {{ selectedCast.user.id }}）</span
+                        >
+                    </div>
+
+                    <textarea
+                        v-model="lineForm.text"
+                        rows="4"
+                        class="w-full border rounded px-3 py-2 text-sm"
+                        placeholder="キャストへ送るメッセージ内容（最大1000文字）"
+                    ></textarea>
+
+                    <label class="inline-flex items-center gap-2 mt-2 text-sm">
+                        <input
+                            type="checkbox"
+                            v-model="lineForm.notification_disabled"
+                        />
+                        通知音を鳴らさない
+                    </label>
+
+                    <div class="mt-3 flex items-center gap-2">
+                        <button
+                            type="button"
+                            @click="sendLine(selectedCast.user.id)"
+                            :disabled="sendingLine || !lineForm.text"
+                            class="px-4 py-2 rounded text-white"
+                            :class="
+                                sendingLine || !lineForm.text
+                                    ? 'bg-gray-400'
+                                    : 'bg-emerald-600 hover:brightness-110'
+                            "
+                        >
+                            {{ sendingLine ? "送信中..." : "LINEに送信" }}
+                        </button>
+                        <span class="text-xs text-gray-500"
+                            >※ 送信には数秒かかる場合があります</span
+                        >
+                    </div>
+                </div>
+
+                <!-- 未連携キャストの場合 -->
+                <div
+                    v-else-if="form.id && !selectedCast?.user?.line_user_id"
+                    class="mt-6 bg-white rounded-2xl shadow p-4 text-gray-500 text-sm"
+                >
+                    <h3 class="text-lg font-semibold mb-2">
+                        LINEメッセージ送信
+                    </h3>
+                    このキャストはまだLINE連携されていません。
                 </div>
             </div>
         </div>
