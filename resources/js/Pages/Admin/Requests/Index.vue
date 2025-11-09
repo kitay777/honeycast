@@ -217,6 +217,9 @@ watch(() => props.selected, (v) => {
           </ul>
         </div>
         <div v-else class="text-sm text-gray-400 mb-3">クーポンは設定されていません。</div>
+      <div class="text-sm text-gray-600">
+        💰 金額: ￥{{ props.selected.total_price?.toLocaleString() || 0 }} 円
+      </div>
 
         <!-- 割当済み -->
         <div class="mb-3">
