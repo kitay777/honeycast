@@ -19,6 +19,10 @@ const props = defineProps({ req: Object });
         <p class="text-lg font-semibold text-right">合計金額：¥{{ props.req.final_price?.toLocaleString() ?? 0 }}</p>
       </div>
 
+      <div class="mt-6 text-right text-xs">
+        株式会社ＬＩＢＲＥ<br />
+        東京都新宿区歌舞伎町2-42-13-812
+      </div>
       <div class="mt-6 text-center text-xs text-gray-500">
         ※この領収書は電子発行です。印刷してご利用いただけます。
       </div>
