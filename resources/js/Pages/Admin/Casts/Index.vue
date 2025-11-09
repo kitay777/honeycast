@@ -90,6 +90,7 @@ const form = useForm({
     area: "",
     tags: "",
     freeword: "",
+    nomination_fee: null,
     photo: null,
 });
 const title = computed(() => (form.id ? "キャスト編集" : "新規キャスト"));
@@ -140,6 +141,7 @@ function selectForEdit(c) {
         form.area = c.area ?? "";
         form.tags = c.tags ?? "";
         form.freeword = c.freeword ?? "";
+        form.nomination_fee = c.nomination_fee ?? null;
         form.photo = null;
         loadPoints(c?.user?.id ?? null);
         nextTick(() => {
@@ -472,6 +474,16 @@ async function submitPoints() {
                             class="w-full border rounded px-3 py-2"
                         />
                     </div>
+<div class="col-span-12 md:col-span-4">
+  <label class="text-sm">指名料（円）</label>
+  <input
+    v-model.number="form.nomination_fee"
+    type="number"
+    min="0"
+    class="w-full border rounded px-3 py-2 text-right"
+    placeholder="例: 5000"
+  />
+</div>
 
                     <div class="col-span-12">
                         <label class="text-sm">タグ（カンマ区切り）</label>

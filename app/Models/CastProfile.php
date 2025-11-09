@@ -18,6 +18,7 @@ class CastProfile extends Model
         'sort_order', 
         'is_primary',
         'should_blur',
+        'nomination_fee',
     ];
 
     protected $casts = [

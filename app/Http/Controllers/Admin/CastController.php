@@ -69,6 +69,7 @@ class CastController extends Controller
             'area'            => $data['area']       ?? null,
             'tags'            => $data['tags']       ?? null,
             'freeword'        => $data['freeword']   ?? null,
+            'nomination_fee'  => $data['nomination_fee'] ?? 0,
             'photo_path'      => $photoPath,
             'is_blur_default' => array_key_exists('is_blur_default', $data)
                                   ? (bool)$data['is_blur_default'] : true,
@@ -101,7 +102,7 @@ class CastController extends Controller
         // CastProfile 側（許可項目のみ反映）
         $cast->fill(Arr::only($data, [
             'nickname','rank','age','height_cm','cup','style','alcohol','mbti',
-            'area','tags','freeword',
+            'area','tags','freeword','nomination_fee',
         ]));
 
         if ($request->has('is_blur_default')) {
@@ -141,6 +142,7 @@ class CastController extends Controller
             'tags'            => ['nullable','string','max:255'],
             'freeword'        => ['nullable','string','max:2000'],
             'photo'           => ['nullable','image','max:4096'],
+            'nomination_fee'  => ['nullable','integer','min:0','max:1000000'],
 
             'is_blur_default' => ['sometimes','boolean'],
         ]);
