@@ -327,6 +327,12 @@ onBeforeUnmount(() => {
                     >貰ったギフト</Link
                 >
                 <Link
+                    href="/my/receipts"
+                    class="block px-5 py-4 hover:bg-white/10"
+                    @click="closeMenu"
+                    >領収書</Link
+                >
+                <Link
                     href="/logout"
                     method="post"
                     as="button"

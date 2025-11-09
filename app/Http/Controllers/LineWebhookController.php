@@ -24,43 +24,62 @@ class LineWebhookController extends Controller
             $lineUserId = $ev['source']['userId'] ?? null;
 
             /* ===================== 1) 参加/辞退（postback） ===================== */
-            if ($type === 'postback') {
-                $dataStr = (string)($ev['postback']['data'] ?? '');
-                parse_str($dataStr, $p); // assign_id=..&action=accept|decline
-                $assignId = (int)($p['assign_id'] ?? 0);
-                $action   = ($p['action'] ?? '') === 'accept' ? 'accepted'
-                           : (($p['action'] ?? '') === 'decline' ? 'declined' : null);
+if ($type === 'postback') {
+    $dataStr = (string)($ev['postback']['data'] ?? '');
+    parse_str($dataStr, $p);
+    $assignId = (int)($p['assign_id'] ?? 0);
+    $action   = ($p['action'] ?? '') === 'accept' ? 'accepted'
+              : (($p['action'] ?? '') === 'decline' ? 'declined' : null);
 
-                if ($assignId && $action && $lineUserId) {
-                    $as = CallRequestCast::with('castProfile.user','callRequest')->find($assignId);
-                    if ($as && $as->castProfile?->user?->line_user_id === $lineUserId) {
-                        if (!$as->responded_at && in_array($as->status, ['invited','assigned','pending'], true)) {
-                            $as->status       = $action;
-                            $as->responded_at = now();
-                            $as->save();
+    if ($assignId && $action && $lineUserId) {
+        $as = CallRequestCast::with('castProfile.user', 'callRequest')->find($assignId);
 
-                            if ($replyToken && $token) {
-                                $msg = $action === 'accepted'
-                                    ? "参加で承りました。ありがとうございます。"
-                                    : "辞退で承りました。またの機会にお願いします。";
-                                Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
-                                    'replyToken' => $replyToken,
-                                    'messages'   => [[ 'type'=>'text', 'text'=>$msg ]],
-                                ]);
-                            }
+        if ($as && $as->castProfile?->user?->line_user_id === $lineUserId) {
+            if (!$as->responded_at && in_array($as->status, ['invited','assigned','pending'], true)) {
+                $as->status       = $action;
+                $as->responded_at = now();
+                $as->save();
 
-                            \Log::info('LINE postback handled', ['assign_id'=>$assignId, 'action'=>$action]);
-                        } else {
-                            \Log::info('LINE postback ignored: already responded or status fixed', ['assign_id'=>$assignId]);
-                        }
-                    } else {
-                        \Log::warning('LINE postback invalid user', ['assign_id'=>$assignId, 'line_user_id'=>$lineUserId]);
-                    }
-                } else {
-                    \Log::warning('LINE postback malformed', ['data'=>$dataStr]);
+                // ✅ 管理者通知
+                $call = $as->callRequest;
+                $adminId = env('LINE_ADMIN_USER_ID');
+                if ($adminId && $token) {
+                    $msg = "📢 【{$as->castProfile->nickname}】さんがリクエスト #{$call->id} に「"
+                        . ($action === 'accepted' ? '参加' : '辞退')
+                        . "」しました。\n"
+                        . "📅 {$call->date} {$call->start_time}〜{$call->end_time}\n"
+                        . "📍 {$call->place}\n";
+                    Http::withToken($token)->post('https://api.line.me/v2/bot/message/push', [
+                        'to' => $adminId,
+                        'messages' => [[ 'type' => 'text', 'text' => $msg ]],
+                    ]);
                 }
-                continue; // postback はここで完了
+
+                // ✅ キャストへの返信
+                if ($replyToken && $token) {
+                    $msg = $action === 'accepted'
+                        ? "参加で承りました。ありがとうございます。"
+                        : "辞退で承りました。またの機会にお願いします。";
+                    Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
+                        'replyToken' => $replyToken,
+                        'messages'   => [[ 'type'=>'text', 'text'=>$msg ]],
+                    ]);
+                }
+
+                \Log::info('LINE postback handled', ['assign_id'=>$assignId, 'action'=>$action]);
+            } else {
+                \Log::info('LINE postback ignored: already responded or status fixed', ['assign_id'=>$assignId]);
             }
+        } else {
+            \Log::warning('LINE postback invalid user', ['assign_id'=>$assignId, 'line_user_id'=>$lineUserId]);
+        }
+    } else {
+        \Log::warning('LINE postback malformed', ['data'=>$dataStr]);
+    }
+
+    continue; // postback はここで完了
+}
+
 
             /* ===================== 2) 友だち追加（follow） ===================== */
 if ($type === 'follow') {

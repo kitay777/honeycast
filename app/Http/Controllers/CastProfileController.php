@@ -91,6 +91,8 @@ class CastProfileController extends Controller
             'photos'     => $photos,
             'tag_ids'    => $selectedIds,
             'tags'       => $profile->tagsRel()->select('tags.id as id', 'tags.name')->orderBy('tags.name')->get(),
+            'user_line_user_id'      => $user->line_user_id ?? null,
+            'user_line_display_name' => $user->line_display_name ?? null,
         ];
 
         return Inertia::render('Cast/ProfileEdit', [

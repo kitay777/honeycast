@@ -64,6 +64,13 @@ use App\Http\Controllers\Admin\CastPhotoController;
 //use App\Http\Controllers\AnotherController;
 use App\Http\Controllers\LineController;
 
+Route::middleware(['auth', 'verified'])
+    ->prefix('my')->name('my.')
+    ->group(function () {
+        Route::get('/receipts', [\App\Http\Controllers\ReceiptController::class, 'index'])->name('receipts.index');
+        Route::get('/receipts/{req}', [\App\Http\Controllers\ReceiptController::class, 'show'])->name('receipts.show');
+    });
+
 Route::get('/line/callback', [LineController::class, 'callback'])->name('line.callback');
 Route::post('/line/unlink', [LineController::class, 'unlink'])->name('line.unlink');
 Route::middleware(['auth','verified','can:admin'])
