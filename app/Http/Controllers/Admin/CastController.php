@@ -70,6 +70,7 @@ class CastController extends Controller
             'tags'            => $data['tags']       ?? null,
             'freeword'        => $data['freeword']   ?? null,
             'nomination_fee'  => $data['nomination_fee'] ?? 0,
+            'rating'          => $data['rating'] ?? null,
             'photo_path'      => $photoPath,
             'is_blur_default' => array_key_exists('is_blur_default', $data)
                                   ? (bool)$data['is_blur_default'] : true,
@@ -80,9 +81,9 @@ class CastController extends Controller
 
     public function update(Request $request, CastProfile $cast)
     {
+
         $data = $this->validated($request, updating: true);
 
-        // User 側（filled の項目のみ）
         if ($request->filled('name') || $request->filled('email') || $request->filled('area')) {
             $cast->user->fill([
                 'name'  => $request->filled('name')  ? $request->string('name')->toString()  : $cast->user->name,
@@ -99,16 +100,16 @@ class CastController extends Controller
             $cast->photo_path = $request->file('photo')->store('cast_photos', 'public');
         }
 
+
+    
         // CastProfile 側（許可項目のみ反映）
         $cast->fill(Arr::only($data, [
             'nickname','rank','age','height_cm','cup','style','alcohol','mbti',
-            'area','tags','freeword','nomination_fee',
+            'area','tags','freeword','nomination_fee','rating',
         ]));
-
         if ($request->has('is_blur_default')) {
             $cast->is_blur_default = $request->boolean('is_blur_default');
         }
-
         $cast->save();
         return back()->with('success', '更新しました');
     }
@@ -139,11 +140,11 @@ class CastController extends Controller
             'style'           => ['nullable','string','max:255'],
             'alcohol'         => ['nullable','string','max:50'],
             'mbti'            => ['nullable','string','max:4'],
-            'tags'            => ['nullable','string','max:255'],
+            'tags'            => ['sometimes'], 
             'freeword'        => ['nullable','string','max:2000'],
             'photo'           => ['nullable','image','max:4096'],
             'nomination_fee'  => ['nullable','integer','min:0','max:1000000'],
-
+            'rating'          => ['nullable','integer','min:1','max:5'],
             'is_blur_default' => ['sometimes','boolean'],
         ]);
     }

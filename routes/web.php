@@ -63,7 +63,21 @@ use App\Http\Controllers\CastQrController;
 use App\Http\Controllers\Admin\CastPhotoController;
 //use App\Http\Controllers\AnotherController;
 use App\Http\Controllers\LineController;
+use App\Http\Controllers\AuthenticatedSessionController;
+use App\Http\Controllers\CallMatchController;
 
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/cast/match', [CallMatchController::class, 'showStartPage'])->name('matches.page');
+    Route::post('/matches/start', [CallMatchController::class, 'start'])->name('matches.start');
+    Route::post('/matches/{match}/extend', [CallMatchController::class, 'extend'])->name('matches.extend');
+    Route::post('/matches/{match}/end', [CallMatchController::class, 'end'])->name('matches.end');
+    Route::get('/matches/{match}/active', [CallMatchController::class, 'active'])->name('matches.active');
+
+});
+
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
+    ->name('logout');
 Route::middleware(['auth', 'verified'])
     ->prefix('my')->name('my.')
     ->group(function () {

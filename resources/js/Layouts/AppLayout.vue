@@ -2,7 +2,10 @@
 import { Link, usePage } from "@inertiajs/vue3";
 import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 
-const page = usePage();
+const page = usePage()
+const user = page.props.auth?.user || null
+// cast_profile を持っているかチェック
+const isCast = !!user?.cast_profile || null
 const modal = ref(page.props.flash?.modal ?? null);
 watch(
     () => page.props.flash,
@@ -301,12 +304,27 @@ onBeforeUnmount(() => {
                     RECRUIT
                 </Link>
 
+<template v-if="isCast">
                 <Link
                     href="/mypage"
                     class="block px-5 py-4 hover:bg-white/10"
                     @click="closeMenu"
                     >マイページ</Link
                 >
+
+                <Link
+                    href="/cast/match"
+                    class="block px-5 py-4 hover:bg-white/10"
+                    @click="closeMenu"
+                    >スタート</Link
+                >
+                <Link
+                    href="/cast/match"
+                    class="block px-5 py-4 hover:bg-white/10"
+                    @click="closeMenu"
+                    >終了/延長</Link
+                >
+</template>
 
                 <Link
                     href="/mypage/points"
@@ -332,15 +350,26 @@ onBeforeUnmount(() => {
                     @click="closeMenu"
                     >領収書</Link
                 >
-                <Link
-                    href="/logout"
-                    method="post"
-                    as="button"
-                    class="block px-5 py-4 hover:bg-white/10"
-                    @click="closeMenu"
-                >
-                    ログアウト
-                </Link>
+                 <!-- ✅ ログイン中だけ表示 -->
+    <div v-if="user">
+      <span class="mr-3">{{ user.name }}</span>
+      <Link
+        method="post"
+        as="button"
+        :href="route('logout')"
+        class="px-3 py-1 bg-red-600 rounded hover:bg-red-700"
+      >
+        ログアウト
+      </Link>
+    </div>
+    <div v-else>
+              <Link
+                  href="/login"
+                  class="block px-5 py-4 hover:bg-white/10"
+                  @click="closeMenu"
+                  >ログイン</Link
+              >
+              </div>    
             </nav>
 
             <!-- 下部に余白 -->

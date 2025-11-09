@@ -122,52 +122,52 @@ const canSend = (g) => {
 };
 
 function send(g) {
-  console.log("🎁 SENDクリック", g)
-  if (!canSend(g)) {
-    if (props.my_balance < g.present_points) {
-      alert("ポイントが不足しています。チャージが必要です。")
-    } else if (props.last_gift_id === g.id) {
-      alert("同じギフトは連続で贈れません。")
-    } else {
-      alert("送信条件を満たしていません。")
+    console.log("🎁 SENDクリック", g);
+    if (!canSend(g)) {
+        if (props.my_balance < g.present_points) {
+            alert("ポイントが不足しています。チャージが必要です。");
+        } else if (props.last_gift_id === g.id) {
+            alert("同じギフトは連続で贈れません。");
+        } else {
+            alert("送信条件を満たしていません。");
+        }
+        return;
     }
-    return
-  }
-  if (!canSend(g)) {
-    console.warn("❌ canSend=false", {
-      balance: props.my_balance,
-      present_points: g.present_points,
-      last_gift_id: props.last_gift_id,
-    })
-    return
-  }
+    if (!canSend(g)) {
+        console.warn("❌ canSend=false", {
+            balance: props.my_balance,
+            present_points: g.present_points,
+            last_gift_id: props.last_gift_id,
+        });
+        return;
+    }
 
-  sendingGift.value = true
-  giftError.value = ""
-  sendForm.cast_id = props.cast.id
-  sendForm.gift_id = g.id
+    sendingGift.value = true;
+    giftError.value = "";
+    sendForm.cast_id = props.cast.id;
+    sendForm.gift_id = g.id;
 
-  console.log("📤 POST開始", sendForm)
+    console.log("📤 POST開始", sendForm);
 
-  sendForm.post("/gifts/send", {
-    preserveScroll: true,
-    onFinish: () => {
-      console.log("✅ onFinish発火")
-      sendingGift.value = false
-    },
-    onSuccess: (res) => {
-      console.log("✅ onSuccess", res)
-      showGift.value = false
-      sendForm.reset("message")
-      giftToast.value = "🎁 贈りました"
-      setTimeout(() => (giftToast.value = ""), 2500)
-      router.reload({ only: ["my_balance", "last_gift_id"] })
-    },
-    onError: (errs) => {
-      console.error("💥 onError", errs)
-      giftError.value = errs?.gift || "送信に失敗しました。"
-    },
-  })
+    sendForm.post("/gifts/send", {
+        preserveScroll: true,
+        onFinish: () => {
+            console.log("✅ onFinish発火");
+            sendingGift.value = false;
+        },
+        onSuccess: (res) => {
+            console.log("✅ onSuccess", res);
+            showGift.value = false;
+            sendForm.reset("message");
+            giftToast.value = "🎁 贈りました";
+            setTimeout(() => (giftToast.value = ""), 2500);
+            router.reload({ only: ["my_balance", "last_gift_id"] });
+        },
+        onError: (errs) => {
+            console.error("💥 onError", errs);
+            giftError.value = errs?.gift || "送信に失敗しました。";
+        },
+    });
 }
 
 function nextGift() {
@@ -284,7 +284,13 @@ function prevGift() {
 
                 <!-- 星とアクション -->
                 <div class="mt-2 flex items-center justify-between">
-                    <div class="text-[#ffcc66]">★ ★ ★ ★ ☆</div>
+                    <div class="text-[#ffcc66] text-lg">
+                        <template v-for="i in 5" :key="i">
+                            <span>{{
+                                i <= (props.cast.rating || 0) ? "★" : "☆"
+                            }}</span>
+                        </template>
+                    </div>
                     <button
                         @click="(gi = 0), (showGift = true)"
                         class="px-4 py-2 rounded bg-pink-600 text-white shadow"
@@ -459,12 +465,12 @@ function prevGift() {
 
                     <!-- 送信ボタン -->
                     <div class="mt-5">
-<button
-  @click="send(curGift)"
-  class="px-4 py-2 rounded bg-pink-600 text-white font-semibold hover:brightness-110"
->
-  🎁 このギフトを贈る
-</button>
+                        <button
+                            @click="send(curGift)"
+                            class="px-4 py-2 rounded bg-pink-600 text-white font-semibold hover:brightness-110"
+                        >
+                            🎁 このギフトを贈る
+                        </button>
                     </div>
 
                     <!-- メッセージ表示 -->

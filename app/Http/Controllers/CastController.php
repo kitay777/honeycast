@@ -171,6 +171,7 @@ class CastController extends Controller
 
                 // ✅ 追加：ユーザーの最終ログイン時間を渡す
                 'last_login_at' => $cast->user?->last_login_at,
+                'rating' => $cast->rating,
             ],
 
             'schedule'     => $days,
