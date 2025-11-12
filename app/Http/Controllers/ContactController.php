@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use Inertia\Inertia;
@@ -17,58 +16,46 @@ class ContactController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'name'    => 'required|string|max:100',
-            'email'   => 'required|email|max:255',
-            'message' => 'required|string|max:2000',
-        ]);
+public function store(Request $request)
+{
+    $data = $request->validate([
+        'name'    => 'required|string|max:100',
+        'email'   => 'required|email|max:255',
+        'phone'   => 'required|string|max:20', // ✅ 追加
+        'message' => 'required|string|max:2000',
+    ]);
 
-        $this->notifyLine($data);
+    $this->notifyLine($data);
 
-        return back()->with('success', 'お問い合わせを送信しました。');
+    return back()->with('success', 'お問い合わせを送信しました。');
+}
+
+protected function notifyLine(array $data)
+{
+    $token = config('services.line.channel_access_token');
+    $toUserId = config('services.line.admin_user_id');
+
+    if (!$token || !$toUserId) {
+        \Log::warning('LINE通知失敗: 設定不足');
+        return;
     }
 
-    protected function notifyLine(array $data)
-    {
-        // ✅ 管理者をメールで特定して取得
-        $admin = User::where('email', 'kitayama@main.co.jp')->first();
+    $text = "📩【お問い合わせ】\n"
+          . "お名前：{$data['name']}\n"
+          . "📧 メール：{$data['email']}\n"
+          . "📞 電話番号：{$data['phone']}\n"   // ✅ 追加
+          . "💬 内容：\n{$data['message']}";
 
-        if (!$admin) {
-            \Log::warning('LINE通知失敗: 管理者ユーザーが見つかりません。');
-            return;
-        }
+    $res = \Http::withToken($token)->post('https://api.line.me/v2/bot/message/push', [
+        'to' => $toUserId,
+        'messages' => [
+            ['type' => 'text', 'text' => $text],
+        ],
+    ]);
 
-        $toUserId = $admin->line_user_id;
-        if (!$toUserId) {
-            \Log::warning("LINE通知失敗: {$admin->email} に line_user_id が設定されていません。");
-            return;
-        }
-
-        // ✅ Messaging API アクセストークン
-        $token = config('services.line.channel_access_token');
-        if (!$token) {
-            \Log::warning('LINE通知失敗: LINEトークンが設定されていません。');
-            return;
-        }
-
-        // ✅ 通知内容
-        $text = "📩【お問い合わせ】\n"
-              . "お名前：{$data['name']}\n"
-              . "メール：{$data['email']}\n"
-              . "内容：\n{$data['message']}";
-
-        // ✅ 送信
-        $res = Http::withToken($token)->post('https://api.line.me/v2/bot/message/push', [
-            'to' => $toUserId,
-            'messages' => [
-                ['type' => 'text', 'text' => $text],
-            ],
-        ]);
-
-        if ($res->failed()) {
-            \Log::error('LINE通知エラー: ' . $res->body());
-        }
+    if ($res->failed()) {
+        \Log::error('LINE通知エラー: ' . $res->body());
     }
+}
+
 }

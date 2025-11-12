@@ -283,21 +283,40 @@ function prevGift() {
                 </div>
 
                 <!-- 星とアクション -->
-                <div class="mt-2 flex items-center justify-between">
-                    <div class="text-[#ffcc66] text-lg">
-                        <template v-for="i in 5" :key="i">
-                            <span>{{
-                                i <= (props.cast.rating || 0) ? "★" : "☆"
-                            }}</span>
-                        </template>
-                    </div>
-                    <button
-                        @click="(gi = 0), (showGift = true)"
-                        class="px-4 py-2 rounded bg-pink-600 text-white shadow"
-                    >
-                        🎁 ギフトを贈る
-                    </button>
-                </div>
+<div class="mt-2 flex items-center justify-between">
+  <div class="text-[#ffcc66] text-lg">
+    <template v-for="i in 5" :key="i">
+      <span>{{ i <= (props.cast.rating || 0) ? "★" : "☆" }}</span>
+    </template>
+  </div>
+
+  <!-- ✅ ボタン3つ並び -->
+  <div class="flex gap-2">
+    <!-- 🟢 ちょこっとボタン -->
+    <button
+      @click="sendLine('choco')"
+      class="px-3 py-2 rounded bg-[#00c300] text-white shadow hover:brightness-105 flex items-center gap-1"
+    >
+      ちょこっと
+    </button>
+
+    <!-- 💬 指名ボタン -->
+    <button
+      @click="sendLine('shimei')"
+      class="px-3 py-2 rounded bg-[#06c755] text-white shadow hover:brightness-105 flex items-center gap-1"
+    >
+      指名
+    </button>
+
+    <!-- 🎁 ギフトを贈る -->
+    <button
+      @click="(gi = 0), (showGift = true)"
+      class="px-4 py-2 rounded bg-pink-600 text-white shadow hover:brightness-110"
+    >
+      🎁 ギフトを贈る
+    </button>
+  </div>
+</div>
             </section>
 
             <!-- スケジュール -->

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Jobs\SendMatchEndReminderJob;
 
 class CallMatchController extends Controller
 {
@@ -95,7 +96,9 @@ public function showStartPage()
         } catch (\Throwable $e) {
             Log::error('LINE通知失敗: ' . $e->getMessage());
         }
-
+        SendMatchEndReminderJob::dispatch($match->id)
+            ->delay(now()->addMinutes($data['duration'] - 10));
+            
         return Inertia::render('Cast/MatchActive', [
             'match' => $match,
         ]);

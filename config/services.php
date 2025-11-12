@@ -49,6 +49,7 @@ return [
     // --- 共通情報 ---
     'bot_add_url' => env('LINE_BOT_ADD_URL') ?: env('VITE_LINE_BOT_ADD_URL'),
     'bot_qr'      => env('LINE_BOT_QR') ?: env('VITE_LINE_BOT_QR'),
+    'admin_user_id' => env('LINE_ADMIN_USER_ID'),
 ],
 
 ];

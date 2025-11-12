@@ -25,5 +25,9 @@ class CallMatch extends Model
     public function castProfile(): BelongsTo {
         return $this->belongsTo(CastProfile::class);
     }
+    protected $casts = [
+        'started_at' => 'datetime',
+        'ended_at'   => 'datetime',
+    ];
 }
 

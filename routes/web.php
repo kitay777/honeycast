@@ -66,6 +66,7 @@ use App\Http\Controllers\LineController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\CallMatchController;
 
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/mypage/account', [\App\Http\Controllers\MyAccountController::class, 'edit'])
         ->name('account.edit');
@@ -307,8 +308,9 @@ Route::middleware(['auth'])->group(function () {
 
 /* ▼ 参照系（CSRF不要） */
 Route::get('/line/link/peek', [LineLinkController::class, 'peek'])->name('line.link.peek');
-Route::post('/line/webhook', [LineWebhookController::class, 'handle'])
-    ->withoutMiddleware([VerifyCsrfTokenMiddleware::class])->name('line.webhook');
+Route::post('/line/webhook', [LineController::class, 'webhook'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->name('line.webhook');
 
 /* ▼ 既存の他ルートはそのまま（省略） */
 

@@ -12,6 +12,7 @@ const props = defineProps({
 const form = useForm({
   name: '',
   email: '',
+  phone: '',   // ✅ ← 追加
   message: '',
 })
 
@@ -41,18 +42,34 @@ const submit = () => {
           @submit.prevent="submit"
           class="space-y-4 text-left bg-black/30 p-6 rounded-md border border-white/10 shadow-lg"
         >
+          <!-- お名前 -->
           <div>
             <label class="block text-sm font-semibold mb-1">お名前</label>
             <input v-model="form.name" type="text" class="w-full rounded-md text-black p-2" required />
             <div v-if="form.errors.name" class="text-red-400 text-xs mt-1">{{ form.errors.name }}</div>
           </div>
 
+          <!-- メールアドレス -->
           <div>
             <label class="block text-sm font-semibold mb-1">メールアドレス</label>
             <input v-model="form.email" type="email" class="w-full rounded-md text-black p-2" required />
             <div v-if="form.errors.email" class="text-red-400 text-xs mt-1">{{ form.errors.email }}</div>
           </div>
 
+          <!-- ✅ 電話番号 -->
+          <div>
+            <label class="block text-sm font-semibold mb-1">電話番号</label>
+            <input
+              v-model="form.phone"
+              type="tel"
+              class="w-full rounded-md text-black p-2"
+              placeholder="例）09012345678"
+              required
+            />
+            <div v-if="form.errors.phone" class="text-red-400 text-xs mt-1">{{ form.errors.phone }}</div>
+          </div>
+
+          <!-- お問い合わせ内容 -->
           <div>
             <label class="block text-sm font-semibold mb-1">お問い合わせ内容</label>
             <textarea

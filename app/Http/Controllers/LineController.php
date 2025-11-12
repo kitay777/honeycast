@@ -89,4 +89,43 @@ class LineController extends Controller
 
         return redirect('/cast/profile/edit')->with('status', 'LINE連携を解除しました。');
     }
+
+    public function webhook(Request $request)
+{
+    $events = $request->input('events', []);
+    $token = config('services.line.channel_access_token');
+
+    foreach ($events as $event) {
+        if (($event['type'] ?? '') === 'postback') {
+            parse_str($event['postback']['data'] ?? '', $data);
+
+            if (($data['action'] ?? '') === 'extend') {
+                $match = \App\Models\CallMatch::find($data['match_id'] ?? null);
+                if ($match) {
+                    $hours = (int)($data['hours'] ?? 1);
+                    $match->increment('duration_minutes', $hours * 60);
+
+                    // キャストにも延長通知
+                    $castLineId = $match->castProfile->user->line_user_id ?? null;
+                    if ($castLineId) {
+                        Http::withToken($token)->post('https://api.line.me/v2/bot/message/push', [
+                            'to' => $castLineId,
+                            'messages' => [['type' => 'text', 'text' => "⏱ マッチが＋{$hours}時間延長されました。"]],
+                        ]);
+                    }
+
+                    // ユーザーに返信
+                    $replyToken = $event['replyToken'];
+                    Http::withToken($token)->post('https://api.line.me/v2/bot/message/reply', [
+                        'replyToken' => $replyToken,
+                        'messages' => [['type' => 'text', 'text' => "✅ {$hours}時間延長しました。"]],
+                    ]);
+                }
+            }
+        }
+    }
+
+    return response()->json(['status' => 'ok']);
+}
+
 }
