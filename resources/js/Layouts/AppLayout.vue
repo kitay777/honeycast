@@ -90,20 +90,22 @@ onBeforeUnmount(() => {
                 />
             </Link>
 
-            <Link
-                href="/shifts"
-                class="flex flex-col items-center"
-            >
-                <img
-                    :src="
-                        page.url === '/shifts'
-                            ? '/assets/icons/schon.png'
-                            : '/assets/icons/sch.png'
-                    "
-                    class="h-12 mb-1"
-                    alt="Likes"
-                />
-            </Link>
+<a
+  href="https://fujoho.jp/index.php?p=shop_info&id=68273"
+  target="_blank"
+  rel="noopener noreferrer"
+  class="flex flex-col items-center"
+>
+  <img
+    :src="
+      page.url === '/shifts'
+        ? '/assets/icons/schon.png'
+        : '/assets/icons/sch.png'
+    "
+    class="h-12 mb-1"
+    alt="Likes"
+  />
+</a>
 
             <Link href="/contact" class="flex flex-col items-center">
                 <img
