@@ -14,39 +14,43 @@ class HandleInertiaRequests extends Middleware
         return parent::version($request);
     }
 
-    public function share(Request $request): array
-    {
-        return [
-            ...parent::share($request),
+public function share(Request $request): array
+{
+    $user = $request->user();
 
-            // 認証情報（必要に応じて select で絞るのも可）
-            'auth' => [
-                'user' => $request->user(),
-            ],
+    return [
+        ...parent::share($request),
 
-            // ★ Vue から fetch/post で使えるように常に渡す
-            'csrf' => csrf_token(),
+        'auth' => [
+            // user 情報（CASTかどうかのフラグもここに含めてもOK）
+            'user' => $user
+                ? $user->only(['id', 'name', 'email', 'is_cast', 'is_admin', 'is_shop_owner'])
+                : null,
 
-            // フラッシュ（既存 + line 用）
-            'flash' => [
-                'success'     => fn () => $request->session()->get('success'),
-                'error'       => fn () => $request->session()->get('error'),
-                'line'        => fn () => $request->session()->get('line'),          // 連携コードなど
-                'line_status' => fn () => $request->session()->get('line_status'),   // 連携確認の返却
-            ],
+            // ★ cast_profile を全ページで共有する（これが必要）
+            'cast_profile' => $user && $user->cast_profile
+                ? $user->cast_profile
+                : null,
+        ],
 
-            // ★ LINE の共有はここに統一。ProfileEdit / 登録ページ / 友だち追加で全て参照可能
-            'line_env' => [
-                // 友だち追加（URL/QR）。config/services.php で定義：
-                // 'bot_add_url' と 'bot_qr' を用意（別名 friend_url などは混乱の元）
-                'bot_url' => config('services.line.bot_add_url'),   // ex: https://page.line.me/xxxxx
-                'bot_qr'  => config('services.line.bot_qr'),        // 省略可
-            ],
+        'csrf' => csrf_token(),
 
-            // （任意）LIFF ID を全ページで使いたい場合
-            'liff' => [
-                'id' => config('services.line.liff_id'),
-            ],
-        ];
-    }
+        'flash' => [
+            'success'     => fn () => $request->session()->get('success'),
+            'error'       => fn () => $request->session()->get('error'),
+            'line'        => fn () => $request->session()->get('line'),
+            'line_status' => fn () => $request->session()->get('line_status'),
+        ],
+
+        'line_env' => [
+            'bot_url' => config('services.line.bot_add_url'),
+            'bot_qr'  => config('services.line.bot_qr'),
+        ],
+
+        'liff' => [
+            'id' => config('services.line.liff_id'),
+        ],
+    ];
+}
+
 }

@@ -3,9 +3,12 @@ import { Link, usePage } from "@inertiajs/vue3";
 import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 
 const page = usePage()
+
 const user = page.props.auth?.user || null
-// cast_profile を持っているかチェック
-const isCast = !!user?.cast_profile || null
+console.log(user)
+const castProfile = page.props.auth?.cast_profile || null
+
+const isCast = !!castProfile
 const modal = ref(page.props.flash?.modal ?? null);
 watch(
     () => page.props.flash,

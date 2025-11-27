@@ -240,6 +240,127 @@ onMounted(async () => {
         autoLinkLine();
     }
 });
+
+/* ====== 写真管理（複数） ====== */
+
+/* サーバから cast.photos が更新されたら、UI側の配列も作り直す */
+watch(
+  () => props.cast?.photos,
+  (photos) => {
+    const arr = (photos ?? []).map(ph => ({
+      id: ph.id,
+      url: ph.url ?? (ph.path ? `/storage/${ph.path}` : null),
+      sort_order: ph.sort_order ?? 0,
+      is_primary: !!ph.is_primary,
+      _blur: ph.should_blur === true,  // ← サーバの should_blur を反映
+      _delete: false,
+    }))
+    existing.value  = arr
+    primaryId.value = arr.find(x => x.is_primary)?.id || null
+  },
+  { immediate: true }
+)
+
+
+/* プレビューURL生成/解放 */
+const getPreviewUrl = (file) => {
+  try {
+    if (file && (file instanceof Blob || file instanceof File)) {
+      const URL_ = (globalThis?.URL || window?.URL || self?.URL)
+      return URL_?.createObjectURL ? URL_.createObjectURL(file) : ''
+    }
+  } catch (_) {}
+  return ''
+}
+const revokePreviewUrl = (src) => {
+  try { (globalThis?.URL || window?.URL || self?.URL)?.revokeObjectURL?.(src) } catch (_) {}
+}
+
+/* 追加/並び替え/メイン/削除/ぼかし */
+const onAddPhotos = (e) => {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  newFiles.value.push(...files)
+  e.target.value = ""
+}
+const move = (idx, dir) => {
+  const to = idx + dir
+  if (to < 0 || to >= existing.value.length) return
+  const a = existing.value[idx]
+  existing.value[idx] = existing.value[to]
+  existing.value[to] = a
+}
+const setPrimary = (ph) => { if (!ph._delete) primaryId.value = ph.id }
+const toggleDelete = (ph) => { ph._delete = !ph._delete; if (ph._delete && primaryId.value === ph.id) primaryId.value = null }
+const toggleBlur   = (ph) => { if (ph.id && !ph._delete) ph._blur = !ph._blur }
+
+/* ====== ぼかし解除（プロフィール/写真） ====== */
+const approve = (permId) => {
+  const id = form.id; if (!id) return
+  router.post(urlFor('casts.unblur.approve', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/approve`), { expires_at: null })
+}
+const deny = (permId) => {
+  const id = form.id; if (!id) return
+  router.post(urlFor('casts.unblur.deny', { castProfile: id, permission: permId }, `/casts/${id}/unblur-requests/${permId}/deny`))
+}
+const approvePhoto = (perm) => {
+  const photoId = perm.photo_id; if (!photoId) return
+  router.post(urlFor('photos.unblur.approve', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/approve`), { expires_at: null })
+}
+const denyPhoto = (perm) => {
+  const photoId = perm.photo_id; if (!photoId) return
+  router.post(urlFor('photos.unblur.deny', { castPhoto: photoId, permission: perm.id }, `/photos/${photoId}/unblur-requests/${perm.id}/deny`))
+}
+
+/* ====== 保存 ====== */
+const submit = () => {
+  form.transform((data) => {
+    const fd = new FormData()
+    // 基本
+    fd.append("nickname", data.nickname ?? "")
+    if (data.rank !== "") fd.append("rank", data.rank)
+    if (data.age !== "") fd.append("age", data.age)
+    if (data.height_cm !== "") fd.append("height_cm", data.height_cm)
+    fd.append("cup", data.cup ?? "")
+    fd.append("style", data.style ?? "")
+    fd.append("alcohol", data.alcohol ?? "")
+    fd.append("mbti", (data.mbti ?? "").toString().toUpperCase())
+    fd.append("area", data.area ?? "")
+    ;(data.tag_ids || []).forEach(id => fd.append("tag_ids[]", id))
+    fd.append("freeword", data.freeword ?? "")
+
+    // 旧・単発
+    if (data.photo instanceof File) fd.append("photo", data.photo)
+    // 複数追加
+    newFiles.value.forEach(f => fd.append("photos[]", f))
+
+    // 並び
+    existing.value.forEach((ph, i) => {
+      if (!ph.id) return
+      fd.append(`orders[${i}][id]`, ph.id)
+      fd.append(`orders[${i}][order]`, i + 1)
+    })
+    // 削除
+    existing.value.filter(ph => ph._delete && ph.id).forEach(ph => fd.append("delete_photo_ids[]", ph.id))
+    // メイン
+    if (primaryId.value) fd.append("primary_photo_id", primaryId.value)
+    // ぼかしON
+    existing.value
+      .filter(ph => ph.id && ph._blur && !ph._delete)
+      .forEach(ph => fd.append('blur_on_ids[]', ph.id))
+
+    return fd
+  }).post(urlFor('cast.profile.update', {}, '/cast/profile'), {
+    forceFormData: true,
+    preserveScroll: true,
+    onSuccess: () => {
+      form.photo = null
+      newFiles.value = []
+      // 最新の cast だけ再取得 → watch が existing/_blur を再構築
+      router.reload({ only: ['cast'] })
+    }
+  })
+}
 </script>
 
 <template>

@@ -79,5 +79,8 @@ class User extends Authenticatable
     protected $casts = [
         'last_login_at' => 'datetime',
     ];
-
+    public function cast_profile()
+    {
+        return $this->hasOne(\App\Models\CastProfile::class, 'user_id');
+    }
 }
