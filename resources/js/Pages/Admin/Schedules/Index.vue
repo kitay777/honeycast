@@ -171,8 +171,13 @@ function removeRow(r){
           </div>
 
           <div class="col-span-6 md:col-span-2">
-            <label class="text-sm">終了</label>
-            <input v-model="form.end_time" type="time" class="w-full border rounded px-3 py-2">
+            <label class="text-sm">終了（翌日可・最大34:00）</label>
+            <input
+              v-model="form.end_time"
+              type="text"
+              placeholder="10:00〜34:00"
+              class="w-full border rounded px-3 py-2"
+            />
             <div v-if="form.errors.end_time" class="text-xs text-red-600 mt-1">{{ form.errors.end_time }}</div>
           </div>
 
