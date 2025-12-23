@@ -292,13 +292,6 @@ function prevGift() {
 
   <!-- ✅ ボタン3つ並び -->
   <div class="flex gap-2">
-    <!-- 🟢 ちょこっとボタン -->
-    <button
-      @click="sendLine('choco')"
-      class="px-3 py-2 rounded bg-[#00c300] text-white shadow hover:brightness-105 flex items-center gap-1"
-    >
-      ちょこっと
-    </button>
 
     <!-- 💬 指名ボタン -->
     <button
@@ -404,6 +397,20 @@ function prevGift() {
             </section>
         </div>
 
+        <div
+            class="fixed z-[60] pointer-events-none left-4"
+            :style="{
+                bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
+            }"
+        >
+            <!-- 🟢 ちょこっとボタン -->
+            <button
+            @click="sendLine('choco')"
+            class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105 active:translate-y-[1px] transition flex items-center gap-2"
+             >
+            ちょこっと
+            </button>
+        </div>
         <!-- 固定CTA -->
         <div
             class="fixed z-[60] pointer-events-none right-4"
@@ -411,6 +418,7 @@ function prevGift() {
                 bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
             }"
         >
+
             <Link
                 as="button"
                 method="post"
