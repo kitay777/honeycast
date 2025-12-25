@@ -121,6 +121,15 @@ const canSend = (g) => {
     return true;
 };
 
+function sendLine(type) {
+  if (type === 'choco') {
+    router.visit('/line/choco')   // ← 遷移先
+  }
+  if (type === 'shimei') {
+    router.visit(`/casts/${props.cast.id}/shimei`)
+  }
+}
+
 function send(g) {
     console.log("🎁 SENDクリック", g);
     if (!canSend(g)) {
@@ -392,7 +401,7 @@ function prevGift() {
         </div>
 
         <div
-            class="fixed z-[60] pointer-events-none left-4"
+            class="fixed z-[60] left-4"
             :style="{
                 bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
             }"
@@ -414,7 +423,7 @@ function prevGift() {
         </div>
         <!-- 固定CTA -->
         <div
-            class="fixed z-[60] pointer-events-none right-4"
+            class="fixed z-[60] right-4"
             :style="{
                 bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
             }"
