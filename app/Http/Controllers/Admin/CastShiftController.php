@@ -83,7 +83,10 @@ class CastShiftController extends Controller
             'cast_profile_id' => ['required','exists:cast_profiles,id'],
             'date'            => ['required','date'],
             'start_time'      => ['required','date_format:H:i'],
-            'end_time'        => ['required','date_format:H:i','after:start_time'],
+                        'end_time' => [
+                    'required',
+                    'regex:/^(?:[0-9]|[01][0-9]|2[0-9]|3[0-4]):[0-5][0-9]$/',
+                ],
             'is_reserved'     => ['boolean'],
         ]);
 
