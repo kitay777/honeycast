@@ -123,10 +123,10 @@ const canSend = (g) => {
 
 function sendLine(type) {
   if (type === 'choco') {
-    router.visit('/line/choco')   // ← 遷移先
+    router.visit('/call')   // ← 遷移先
   }
   if (type === 'shimei') {
-    router.visit(`/casts/${props.cast.id}/shimei`)
+    router.visit(`/call?cast_id=${props.cast.id}`)   // ← 遷移先
   }
 }
 
