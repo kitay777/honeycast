@@ -117,29 +117,15 @@ $now = Carbon::now('Asia/Tokyo');
 $todayDate = $now->toDateString();
 $nowMinutes = $now->hour * 60 + $now->minute;
 
+
 $today = CastShift::with(['castProfile.user'])
     ->where('date', $todayDate)
-    ->where('is_reserved', false) // 必要なければ消す
+    ->where('is_reserved', false) // ← 予約済みも出したいなら消す
     ->get()
-    ->filter(function ($shift) use ($nowMinutes) {
-
-        [$sh, $sm] = explode(':', $shift->start_time);
-        [$eh, $em] = explode(':', $shift->end_time);
-
-        $start = ((int)$sh) * 60 + (int)$sm;
-        $end   = ((int)$eh) * 60 + (int)$em;
-
-        // 24時超え対応（26:00 等）
-        if ($end < $start) {
-            $end += 24 * 60;
-        }
-
-        return $nowMinutes >= $start && $nowMinutes <= $end;
-    })
     ->map(fn ($shift) => $toCard($shift->castProfile))
-    ->unique('id')
+    ->unique('id')   // 同じキャストが複数枠あっても1人にする
     ->values()
-    ->take(9)
+    ->take(20)
     ->all();
 
         return Inertia::render('Dashboard', [
