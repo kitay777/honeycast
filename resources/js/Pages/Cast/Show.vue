@@ -293,13 +293,7 @@ function prevGift() {
   <!-- ✅ ボタン3つ並び -->
   <div class="flex gap-2">
 
-    <!-- 💬 指名ボタン -->
-    <button
-      @click="sendLine('shimei')"
-      class="px-3 py-2 rounded bg-[#06c755] text-white shadow hover:brightness-105 flex items-center gap-1"
-    >
-      指名
-    </button>
+
 
     <!-- 🎁 ギフトを贈る -->
     <button
@@ -410,6 +404,13 @@ function prevGift() {
              >
             ちょこっと
             </button>
+                <!-- 💬 指名ボタン -->
+    <button
+      @click="sendLine('shimei')"
+      class="px-3 py-2 rounded bg-[#06c755] text-white shadow hover:brightness-105 flex items-center gap-1"
+    >
+      指名
+    </button>
         </div>
         <!-- 固定CTA -->
         <div
