@@ -46,7 +46,7 @@ onBeforeUnmount(()=>{ window.removeEventListener('mousemove', onDrag); window.re
 const selectedId = ref(null)
 const form = useForm({
   id: null,
-  cast_profile_id: '',
+  cast_profile_id: null, // ← '' ではなく null
   date: month.value + '-01',
   start_time: '10:00',
   end_time: '12:00',
@@ -59,12 +59,13 @@ function resetForm(){ form.reset(); form.clearErrors(); form.id=null; selectedId
 function pick(r){
   selectedId.value = r.id
   form.id = r.id
-  form.cast_profile_id = r.cast_profile_id
+  form.cast_profile_id = Number(r.cast_profile_id) // ★ここ
   form.date = r.date
   form.start_time = r.start_time?.slice(0,5) || '00:00'
   form.end_time   = r.end_time?.slice(0,5)   || '00:00'
   form.is_reserved = !!r.is_reserved
 }
+
 
 function submitCreate(){ form.post('/admin/schedules', { onSuccess:()=> resetForm(), preserveScroll:true }) }
 function submitUpdate(){ form.put(`/admin/schedules/${form.id}`, { preserveScroll:true }) }

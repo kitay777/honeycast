@@ -24,12 +24,27 @@ class CastShiftController extends Controller
             ->orderByDesc('id')
             ->get(['id','user_id','nickname','area']);
 
-        $shifts = CastShift::with(['castProfile:id,user_id,nickname', 'castProfile.user:id,name,email'])
-            ->when($castId, fn($q) => $q->where('cast_profile_id', $castId))
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-            ->orderBy('date')->orderBy('start_time')
-            ->paginate(50)
-            ->withQueryString();
+$shifts = CastShift::with(['castProfile.user'])
+    ->when($castId, fn($q) => $q->where('cast_profile_id', $castId))
+    ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+    ->orderBy('date')
+    ->orderBy('start_time')
+    ->paginate(50)
+    ->through(fn ($s) => [
+        'id' => $s->id,
+        'date' => \Carbon\Carbon::parse($s->date)->format('Y-m-d'),
+        'start_time' => $s->start_time,
+        'end_time' => $s->end_time,
+        'is_reserved' => $s->is_reserved,
+        'cast_profile_id' => $s->cast_profile_id,
+        'cast_profile' => [
+            'nickname' => $s->castProfile?->nickname,
+            'user' => [
+                'name' => $s->castProfile?->user?->name,
+            ],
+        ],
+    ]);
+
 
         return Inertia::render('Admin/Schedules/Index', [
             'month'   => $start->format('Y-m'),
@@ -43,39 +58,42 @@ class CastShiftController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
-        $v = $request->validate([
-            'cast_profile_id' => ['required','exists:cast_profiles,id'],
-            'date'            => ['required','date'],
-            'start_time'      => ['required','date_format:H:i'],
-            'end_time' => [
-                    'required',
-                    'regex:/^(?:[0-9]|[01][0-9]|2[0-9]|3[0-4]):[0-5][0-9]$/',
-                ],
-            'is_reserved'     => ['boolean'],
-        ]);
+public function store(Request $request, int $castId)
+{
+    $data = $request->validate([
+        'days' => ['required','array'],
+        'days.*.date' => ['required','date'],
+        'days.*.slots' => ['array'],
+        'days.*.slots.*.start' => ['required','date_format:H:i'],
+        'days.*.slots.*.end'   => [
+            'required',
+            'regex:/^(?:[0-9]|[01][0-9]|2[0-9]|3[0-4]):[0-5][0-9]$/'
+        ],
+    ]);
 
-        // (cast_profile_id, date, start_time) のユニークをアプリ側でも検知
-        $request->validate([
-            'start_time' => [
-                Rule::unique('cast_shifts', 'start_time')->where(fn($q) =>
-                    $q->where('cast_profile_id', $v['cast_profile_id'])
-                      ->where('date', $v['date'])
-                ),
-            ],
-        ]);
+    foreach ($data['days'] as $day) {
 
-        CastShift::create([
-            'cast_profile_id' => $v['cast_profile_id'],
-            'date'            => $v['date'],
-            'start_time'      => $v['start_time'],
-            'end_time'        => $v['end_time'],
-            'is_reserved'     => $request->boolean('is_reserved'),
-        ]);
+        // ★ その日の分は一旦全削除（完全同期）
+        CastShift::where('cast_profile_id', $castId)
+            ->where('date', $day['date'])
+            ->delete();
 
-        return back()->with('success','シフトを作成しました');
+        // 再登録
+        foreach ($day['slots'] ?? [] as $slot) {
+            CastShift::create([
+                'cast_profile_id' => $castId,
+                'date'            => $day['date'],
+                'start_time'      => $slot['start'],
+                'end_time'        => $slot['end'],
+                'is_reserved'     => false,
+            ]);
+        }
     }
+
+    return back()->with('success', 'スケジュールを保存しました');
+}
+
+
 
     public function update(Request $request, CastShift $shift)
     {
