@@ -410,9 +410,7 @@ function prevGift() {
         >
 
             <Link
-                as="button"
-                method="post"
-                :href="startChoco"
+                href="/call"
                 class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105 active:translate-y-[1px] transition flex items-center gap-2"
             >
                 <img src="/assets/icons/message.png" alt="" class="h-5 w-5" />
@@ -420,9 +418,7 @@ function prevGift() {
             </Link>
                 <!-- 💬 指名ボタン -->
  <Link
-                as="button"
-                method="post"
-                :href="startShimei"
+                href="/call"
                 class="pointer-events-auto h-10 px-3 rounded-full bg-[#e7d7a0] text-black text-sm font-medium shadow-[0_6px_18px_rgba(0,0,0,.28)] border border-black/10 hover:brightness-105 active:translate-y-[1px] transition flex items-center gap-2"
             >
                 <img src="/assets/icons/message.png" alt="" class="h-5 w-5" />
