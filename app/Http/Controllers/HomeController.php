@@ -9,6 +9,8 @@ use App\Models\TextBanner;
 use App\Models\AdBanner;
 use App\Models\NewsItem;
 use Illuminate\Support\Facades\DB;
+use App\Models\CastShift;
+use Carbon\Carbon;
 
 class HomeController extends Controller
 {
@@ -108,10 +110,37 @@ class HomeController extends Controller
         }
 
         // ====== ダッシュボード用（すべて user リレーション付き） ======
-        $today   = CastProfile::with('user')->latest('updated_at')->take(9)->get()->map($toCard)->values()->all();
         $login   = CastProfile::with('user')->latest('updated_at')->take(9)->get()->map($toCard)->values()->all();
         $newbies = CastProfile::with('user')->latest('created_at')->take(9)->get()->map($toCard)->values()->all();
         $roster  = CastProfile::with('user')->orderBy('nickname')->take(9)->get()->map($toCard)->values()->all();
+$now = Carbon::now('Asia/Tokyo');
+$todayDate = $now->toDateString();
+$nowMinutes = $now->hour * 60 + $now->minute;
+
+$today = CastShift::with(['castProfile.user'])
+    ->where('date', $todayDate)
+    ->where('is_reserved', false) // 必要なければ消す
+    ->get()
+    ->filter(function ($shift) use ($nowMinutes) {
+
+        [$sh, $sm] = explode(':', $shift->start_time);
+        [$eh, $em] = explode(':', $shift->end_time);
+
+        $start = ((int)$sh) * 60 + (int)$sm;
+        $end   = ((int)$eh) * 60 + (int)$em;
+
+        // 24時超え対応（26:00 等）
+        if ($end < $start) {
+            $end += 24 * 60;
+        }
+
+        return $nowMinutes >= $start && $nowMinutes <= $end;
+    })
+    ->map(fn ($shift) => $toCard($shift->castProfile))
+    ->unique('id')
+    ->values()
+    ->take(9)
+    ->all();
 
         return Inertia::render('Dashboard', [
             'search_applied' => $hasFilter,
