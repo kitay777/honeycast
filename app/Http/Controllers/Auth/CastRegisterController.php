@@ -41,18 +41,23 @@ class CastRegisterController extends Controller
 
             // 3) CastProfile 作成（デフォルトはブラーON）
             CastProfile::create([
-                'user_id'         => $user->id,
-                'nickname'        => $data['nickname'] ?? null,
-                'rank'            => $data['rank'] ?? null,
-                'age'             => $data['age'] ?? null,
-                'height_cm'       => $data['height_cm'] ?? null,
-                'cup'             => $data['cup'] ?? null,
-                'style'           => $data['style'] ?? null,
-                'alcohol'         => $data['alcohol'] ?? null,
-                'mbti'            => isset($data['mbti']) ? strtoupper($data['mbti']) : null,
-                'area'            => $data['cast_area'] ?? ($data['area'] ?? null), // プロフ用エリアを分けたい場合
-                'tags'            => $data['tags'] ?? [],
-                'freeword'        => $data['freeword'] ?? null,
+                'user_id'   => $user->id,
+
+                // ★ 必須（null禁止）
+                'nickname'  => $data['nickname'],
+                'age'       => $data['age'],
+                'height_cm' => $data['height_cm'],
+
+                // 任意
+                'rank'      => $data['rank'] ?? null,
+                'cup'       => $data['cup'] ?? null,
+                'style'     => $data['style'] ?? null,
+                'alcohol'   => $data['alcohol'] ?? null,
+                'mbti'      => isset($data['mbti']) ? strtoupper($data['mbti']) : null,
+                'area'      => $data['cast_area'] ?? ($data['area'] ?? null),
+                'tags'      => $data['tags'] ?? [],
+                'freeword'  => $data['freeword'] ?? null,
+
                 'photo_path'      => $photoPath,
                 'is_blur_default' => true,
             ]);

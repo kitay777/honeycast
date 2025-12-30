@@ -8,8 +8,11 @@ const form = useForm({
 
   // CastProfile（最低限）
   nickname: '',
-  age: '', height_cm: '',
-  style: '', alcohol: '', mbti: '',
+  age: '', 
+  height_cm: '',
+  style: '', 
+  alcohol: '', 
+  mbti: '',
   cast_area: '',
   tags: [],
   freeword: '',
@@ -21,7 +24,11 @@ const onPhotoChange = (e) => {
   form.photo = f
 }
 
-const submit = () => form.post(route('cast.register.store'), { forceFormData: true })
+const submit = () => {
+  if (form.age === null) form.age = ''
+  if (form.height_cm === null) form.height_cm = ''
+  form.post(route('cast.register.store'), { forceFormData: true })
+}
 </script>
 
 <template>
@@ -32,23 +39,23 @@ const submit = () => form.post(route('cast.register.store'), { forceFormData: tr
       <!-- User -->
       <div class="space-y-3">
         <div>
-          <label class="text-sm">お名前</label>
+          <label class="text-sm">お名前(必須)</label>
           <input v-model="form.name" class="w-full h-11 rounded px-3 text-black" />
           <p v-if="form.errors.name" class="text-red-300 text-xs mt-1">{{ form.errors.name }}</p>
         </div>
         <div>
-          <label class="text-sm">メール</label>
+          <label class="text-sm">メール(必須)</label>
           <input v-model="form.email" type="email" class="w-full h-11 rounded px-3 text-black" />
           <p v-if="form.errors.email" class="text-red-300 text-xs mt-1">{{ form.errors.email }}</p>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-sm">パスワード</label>
+            <label class="text-sm">パスワード(必須)</label>
             <input v-model="form.password" type="password" class="w-full h-11 rounded px-3 text-black" />
             <p v-if="form.errors.password" class="text-red-300 text-xs mt-1">{{ form.errors.password }}</p>
           </div>
           <div>
-            <label class="text-sm">確認</label>
+            <label class="text-sm">確認(必須)</label>
             <input v-model="form.password_confirmation" type="password" class="w-full h-11 rounded px-3 text-black" />
           </div>
         </div>
@@ -61,17 +68,20 @@ const submit = () => form.post(route('cast.register.store'), { forceFormData: tr
       <!-- CastProfile（必要なら最小限だけ） -->
       <div class="mt-6 space-y-3">
         <div>
-          <label class="text-sm">ニックネーム</label>
+          <label class="text-sm">ニックネーム(必須)</label>
           <input v-model="form.nickname" class="w-full h-11 rounded px-3 text-black" />
-        </div>
+        <p v-if="form.errors.nickname" class="text-red-300 text-xs mt-1">{{ form.errors.nickname }}</p>
+      </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-sm">年齢</label>
+            <label class="text-sm">年齢(必須)</label>
             <input v-model.number="form.age" type="number" min="18" max="99" class="w-full h-11 rounded px-3 text-black" />
+          <p v-if="form.errors.age" class="text-red-300 text-xs mt-1">{{ form.errors.age }}</p>
           </div>
           <div>
-            <label class="text-sm">身長(cm)</label>
+            <label class="text-sm">身長(cm)(必須)</label>
             <input v-model.number="form.height_cm" type="number" min="120" max="220" class="w-full h-11 rounded px-3 text-black" />
+          <p v-if="form.errors.height_cm" class="text-red-300 text-xs mt-1">{{ form.errors.height_cm }}</p>
           </div>
         </div>
 
