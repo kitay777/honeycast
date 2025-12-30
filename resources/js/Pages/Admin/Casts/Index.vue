@@ -4,6 +4,13 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import CastPhotosManager from "@/Components/Admin/CastPhotosManager.vue";
 
+const rankOptions = [
+    { value: 1, label: "★ ルーキー" },
+    { value: 2, label: "★★ レギュラー" },
+    { value: 3, label: "★★★ 人気" },
+    { value: 4, label: "★★★★ トップ" },
+    { value: 5, label: "★★★★★ レジェンド" },
+];
 /** route() フォールバック */
 const urlFor = (name, params = {}, fallback = "") => {
     try {
@@ -80,7 +87,7 @@ const form = useForm({
     name: "",
     email: "",
     nickname: "",
-    rank: "",
+    rank: null,
     age: null,
     height_cm: null,
     cup: "",
@@ -132,7 +139,7 @@ function selectForEdit(c) {
         form.name = c.user?.name ?? "";
         form.email = c.user?.email ?? "";
         form.nickname = c.nickname ?? "";
-        form.rank = c.rank ?? "";
+        form.rank = c.rank ?? null;
         form.age = c.age ?? null;
         form.height_cm = c.height_cm ?? null;
         form.cup = c.cup ?? "";
@@ -457,7 +464,6 @@ async function submitPoints() {
                     <div
                         v-for="f in [
                             ['nickname', 'ニックネーム'],
-                            ['rank', 'ランク'],
                             ['age', '年齢'],
                             ['height_cm', '身長(cm)'],
                             ['cup', 'Cup'],
@@ -476,6 +482,23 @@ async function submitPoints() {
                             class="w-full border rounded px-3 py-2"
                         />
                     </div>
+                    <!-- ランク（tinyint） -->
+<div class="col-span-6 md:col-span-2">
+    <label class="text-sm">ランク</label>
+    <select
+        v-model.number="form.rank"
+        class="w-full border rounded px-3 py-2"
+    >
+        <option :value="null">未設定</option>
+        <option
+            v-for="r in rankOptions"
+            :key="r.value"
+            :value="r.value"
+        >
+            {{ r.label }}
+        </option>
+    </select>
+</div>
                     <div class="col-span-12 md:col-span-4">
                         <label class="text-sm">指名料（円）</label>
                         <input
@@ -531,6 +554,7 @@ async function submitPoints() {
                         </button>
                     </div>
                 </form>
+
 
                 <!-- ✅ formの外！ -->
                 <div
